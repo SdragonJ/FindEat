@@ -1,0 +1,22 @@
+{
+  "name": "findeat_cursor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FindEat_CURSOR — 회사 주변 맛집 추천 (Express API + 정적 HTML/JS, MariaDB). JSON은 표준상 주석 불가: 스크립트는 npm start / npm dev, 엔트리는 server.js.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "import:naver": "node scripts/naver-local-import.mjs",
+    "verify:naver": "node scripts/verify-naver.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "mysql2": "^3.22.3"
+  }
+}

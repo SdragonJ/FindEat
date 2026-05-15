@@ -1,0 +1,427 @@
+<!doctype html>
+<!--
+  FindEat_CURSOR — 진입 정적 HTML (마크업 + 스크립트 로드)
+
+  [역할]
+  - 브라우저가 / 또는 /index.html 을 요청하면 server.js 의 express.static('public') 이 이 파일을 보냅니다.
+  - 목록·폼·화면 전환은 맨 아래 <script src="/app.js"> 가 담당하고, /api/* 는 같은 출처의 Express 서버가 응답합니다.
+  - URL은 고정이고, div#viewHome / viewEdit / viewAdd 를 숨김·표시만 바꿉니다.
+
+  [문법 힌트]
+  - hidden 속성: CSS display:none 과 비슷하게 요소를 접근성 트리에서도 숨길 때 사용합니다.
+  - aria-* / role: 스크린 리더 등 보조 기술을 위한 WAI-ARIA 표준입니다.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FindEat_CURSOR · 회사 주변 맛집</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <!-- 홈: 점심 추천 + 식당 목록 버튼으로 아래 목록 블록 펼침 -->
+      <div id="viewHome" class="view">
+        <header class="hero">
+          <p class="hero-badge" aria-hidden="true">#맛있는 하루</p>
+          <p class="hero-badge" aria-hidden="true">#먹방</p>
+          <p class="hero-badge" aria-hidden="true">#회사 주변 맛집</p>
+          <p class="hero-badge" aria-hidden="true">
+            #먹을 만한 데가 어디 없나?
+          </p>
+          <h1>FindEat</h1>
+          <p class="tagline">즐거운 점심시간, 뭐먹을지 내가 골라줌</p>
+        </header>
+
+        <section class="card pick-card">
+          <div class="pick-head">
+            <h2 class="pick-title">오늘 점심 추천</h2>
+            <button
+              type="button"
+              id="btnPick"
+              class="btn primary pick-head-btn"
+            >
+              추천 받기
+            </button>
+          </div>
+          <div class="pick-stack pick-filters-inset">
+            <label class="field-label" for="pickDistance">거리</label>
+            <div class="pick-distance-row">
+              <select id="pickDistance" class="pick-distance-select">
+                <option value="">제한 없음</option>
+                <option value="100">100m (약 2분)</option>
+                <option value="300">300m (약 5분)</option>
+                <option value="600">600m (약 10분)</option>
+              </select>
+              <label
+                class="pick-matjip-toggle toggle-stamp"
+                for="pickMatjipOnly"
+              >
+                <input
+                  type="checkbox"
+                  id="pickMatjipOnly"
+                  class="toggle-stamp__input"
+                />
+                <span class="toggle-stamp__face">
+                  <span class="toggle-stamp__ring" aria-hidden="true"></span>
+                  <span class="toggle-stamp__text">맛집</span>
+                </span>
+              </label>
+            </div>
+            <p class="field-hint">
+              괄호 안은 시속 약 4km로 걸을 때 도보 예상 시간이에요.
+            </p>
+            <label class="field-label" for="pickCat">음식 종류</label>
+            <select id="pickCat" class="field-full">
+              <option value="">전체에서 골라줘</option>
+            </select>
+            <label class="field-label" for="pickRating">별점</label>
+            <select id="pickRating" class="field-full">
+              <option value="">전체 (별점 무관)</option>
+              <option value="1">⭐ 1점 이상</option>
+              <option value="2">⭐ 2점 이상</option>
+              <option value="3">⭐ 3점 이상</option>
+              <option value="4">⭐ 4점 이상</option>
+              <option value="5">⭐ 5점</option>
+            </select>
+          </div>
+          <div id="pickResult" class="pick-result" hidden></div>
+        </section>
+
+        <div class="home-pick-actions">
+          <button type="button" id="btnGoList" class="btn btn-blue btn-block">
+            식당 목록 및 추가
+          </button>
+        </div>
+
+        <div id="homeListBlock" class="home-list-block" hidden>
+          <section class="card">
+            <div class="card-head">
+              <h2>식당 목록</h2>
+              <div class="card-head-actions list-card-head-actions">
+                <button type="button" id="btnSyncNaver" class="btn btn-ghost">
+                  주변 식당 최신화
+                </button>
+                <button type="button" id="btnOpenAdd" class="btn btn-blue">
+                  식당 추가
+                </button>
+                <button
+                  type="button"
+                  id="btnListSearch"
+                  class="btn primary pick-head-btn"
+                >
+                  검색
+                </button>
+              </div>
+            </div>
+            <div class="pick-stack pick-filters-inset">
+              <label class="field-label" for="filterDistance">거리</label>
+              <div class="pick-distance-row">
+                <select id="filterDistance" class="pick-distance-select">
+                  <option value="">제한 없음</option>
+                  <option value="100">100m (약 2분)</option>
+                  <option value="300">300m (약 5분)</option>
+                  <option value="600">600m (약 10분)</option>
+                </select>
+                <label
+                  class="pick-matjip-toggle toggle-stamp"
+                  for="filterMatjipOnly"
+                >
+                  <input
+                    type="checkbox"
+                    id="filterMatjipOnly"
+                    class="toggle-stamp__input"
+                  />
+                  <span class="toggle-stamp__face">
+                    <span class="toggle-stamp__ring" aria-hidden="true"></span>
+                    <span class="toggle-stamp__text">맛집</span>
+                  </span>
+                </label>
+              </div>
+              <p class="field-hint">
+                괄호 안은 시속 약 4km로 걸을 때 도보 예상 시간이에요.
+              </p>
+              <label class="field-label" for="filterCat">음식 종류</label>
+              <select id="filterCat" class="field-full">
+                <option value="">전체에서 골라줘</option>
+              </select>
+              <label class="field-label" for="filterRating">별점</label>
+              <select id="filterRating" class="field-full">
+                <option value="">전체 (별점 무관)</option>
+                <option value="1">⭐ 1점 이상</option>
+                <option value="2">⭐ 2점 이상</option>
+                <option value="3">⭐ 3점 이상</option>
+                <option value="4">⭐ 4점 이상</option>
+                <option value="5">⭐ 5점</option>
+              </select>
+              <p class="field-hint">
+                조건을 고른 뒤 위의 검색을 누르면 그 기준으로 목록이 바뀝니다.
+              </p>
+            </div>
+            <div class="list-browse-panel">
+              <ul id="list" class="list"></ul>
+              <p id="empty" class="muted empty-msg empty-msg--panel" hidden>
+                아직 조건에 맞는 곳이 없어요. 식당 추가에서 등록해 보세요.
+              </p>
+              <nav
+                id="listPager"
+                class="list-pager"
+                aria-label="목록 페이지"
+                hidden
+              ></nav>
+              <p
+                id="count"
+                class="muted list-count-footer"
+                aria-live="polite"
+              ></p>
+            </div>
+          </section>
+        </div>
+
+        <footer class="footer">
+          <span id="dbStatus" class="muted">DB 연결 확인 중…</span>
+        </footer>
+      </div>
+
+      <!-- 수정: 동일 문서 안에서 뷰만 전환 -->
+      <div id="viewEdit" class="view hidden">
+        <header class="sub-hero">
+          <button
+            type="button"
+            id="btnEditBack"
+            class="btn btn-back"
+            aria-label="뒤로"
+          >
+            ← 돌아가기
+          </button>
+          <h2 class="sub-title">맛집 수정</h2>
+          <p class="sub-tagline">정보를 바꾼 뒤 저장해 주세요</p>
+        </header>
+
+        <section class="card">
+          <form id="formEdit" class="form-add">
+            <input type="hidden" name="id" id="editId" />
+            <div class="grid">
+              <div class="name-matjip-row full">
+                <label class="name-matjip-name">
+                  식당이름
+                  <input
+                    name="name"
+                    id="editName"
+                    class="input-required"
+                    required
+                    maxlength="120"
+                    placeholder="예: OO국밥"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="name-matjip-toggle toggle-stamp" for="editMatjip">
+                  <input
+                    type="checkbox"
+                    name="is_matjip"
+                    id="editMatjip"
+                    value="1"
+                    class="toggle-stamp__input"
+                  />
+                  <span class="toggle-stamp__face">
+                    <span class="toggle-stamp__ring" aria-hidden="true"></span>
+                    <span class="toggle-stamp__text">맛집</span>
+                  </span>
+                </label>
+              </div>
+              <label class="full">
+                도보 (분)
+                <input
+                  name="walk_minutes"
+                  id="editWalk"
+                  class="input-required"
+                  type="number"
+                  required
+                  min="0"
+                  max="255"
+                  placeholder="회사에서 걸어서"
+                />
+              </label>
+              <label class="full">
+                주소 / 위치
+                <input
+                  name="address"
+                  id="editAddress"
+                  maxlength="255"
+                  placeholder="건물명, 골목 등"
+                />
+              </label>
+              <label>
+                음식 종류
+                <select name="category" id="editCategory" class="filter-select">
+                  <option value="기타">기타</option>
+                </select>
+              </label>
+              <label class="full">
+                별점 (최대 5점)
+                <div class="rating-row">
+                  <div
+                    id="editStarRow"
+                    class="star-row"
+                    role="group"
+                    aria-label="별점 선택"
+                  ></div>
+                  <input
+                    type="number"
+                    name="rating"
+                    id="editRatingNum"
+                    class="rating-num-input"
+                    min="1"
+                    max="5"
+                    step="1"
+                    placeholder="1~5"
+                  />
+                </div>
+                <p class="field-hint">
+                  ⭐·☆을 누르거나 옆에 숫자를 입력하세요. 비우면 별점 없음.
+                </p>
+              </label>
+              <label class="full">
+                메모
+                <textarea
+                  name="memo"
+                  id="editMemo"
+                  maxlength="500"
+                  rows="2"
+                  placeholder="메뉴 추천, 웨이팅 팁…"
+                ></textarea>
+              </label>
+            </div>
+            <button type="submit" class="btn btn-blue btn-block">저장</button>
+          </form>
+          <div class="edit-actions-below">
+            <button
+              type="button"
+              id="btnEditDelete"
+              class="btn danger btn-block"
+            >
+              삭제
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- 추가 폼 -->
+      <div id="viewAdd" class="view hidden">
+        <header class="sub-hero">
+          <button
+            type="button"
+            id="btnAddBack"
+            class="btn btn-back"
+            aria-label="뒤로"
+          >
+            ← 돌아가기
+          </button>
+          <h2 class="sub-title">식당 추가</h2>
+          <p class="sub-tagline">동료들과 공유할 곳을 적어 주세요</p>
+        </header>
+
+        <section class="card">
+          <form id="formAdd" class="form-add">
+            <div class="grid">
+              <div class="name-matjip-row full">
+                <label class="name-matjip-name">
+                  식당이름
+                  <input
+                    name="name"
+                    class="input-required"
+                    required
+                    maxlength="120"
+                    placeholder="예: OO국밥"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="name-matjip-toggle toggle-stamp" for="addMatjip">
+                  <input
+                    type="checkbox"
+                    name="is_matjip"
+                    id="addMatjip"
+                    value="1"
+                    class="toggle-stamp__input"
+                  />
+                  <span class="toggle-stamp__face">
+                    <span class="toggle-stamp__ring" aria-hidden="true"></span>
+                    <span class="toggle-stamp__text">맛집</span>
+                  </span>
+                </label>
+              </div>
+              <label class="full">
+                도보 (분)
+                <input
+                  name="walk_minutes"
+                  class="input-required"
+                  type="number"
+                  required
+                  min="0"
+                  max="255"
+                  placeholder="회사에서 걸어서"
+                />
+              </label>
+              <label class="full">
+                주소 / 위치
+                <input
+                  name="address"
+                  maxlength="255"
+                  placeholder="건물명, 골목 등"
+                />
+              </label>
+              <label>
+                음식 종류
+                <select name="category" id="addCategory" class="filter-select">
+                  <option value="기타">기타</option>
+                </select>
+              </label>
+              <label class="full">
+                별점 (최대 5점)
+                <div class="rating-row">
+                  <div
+                    id="addStarRow"
+                    class="star-row"
+                    role="group"
+                    aria-label="별점 선택"
+                  ></div>
+                  <input
+                    type="number"
+                    name="rating"
+                    id="addRatingNum"
+                    class="rating-num-input"
+                    min="1"
+                    max="5"
+                    step="1"
+                    placeholder="1~5"
+                  />
+                </div>
+                <p class="field-hint">
+                  ⭐·☆을 누르거나 옆에 숫자를 입력하세요. 비우면 별점 없음.
+                </p>
+              </label>
+              <label class="full">
+                메모
+                <textarea
+                  name="memo"
+                  maxlength="500"
+                  rows="2"
+                  placeholder="메뉴 추천, 웨이팅 팁…"
+                ></textarea>
+              </label>
+            </div>
+            <button type="submit" class="btn btn-blue btn-block">등록</button>
+          </form>
+        </section>
+      </div>
+    </div>
+    <!-- 스크립트는 body 끝에 두어 DOM 파싱 후 실행됩니다. -->
+    <script src="/app.js"></script>
+  </body>
+</html>
