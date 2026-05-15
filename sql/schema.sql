@@ -1,5 +1,7 @@
 -- FindEat_CURSOR — SQL Server 스키마
 --
+-- MariaDB / MySQL 은 `sql/schema_mariadb.sql` 을 사용하세요.
+--
 -- [학습]
 -- - SSMS/DBeaver에서 “스크립트 실행”으로 통째로 실행합니다. GO는 배치 구분자(SSMS/T-SQL).
 -- - IF DB_ID(...) : 데이터베이스가 없을 때만 CREATE (이미 있으면 건너뜀).
