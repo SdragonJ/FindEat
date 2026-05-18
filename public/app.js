@@ -79,12 +79,66 @@ function ratingVisualHtml(score) {
   return `<span class="list-rating" title="${n}점">${filled}${empty} <span class="muted">${n}/5</span></span>`;
 }
 
+/** 별점 4+ → 맛집, 3 이하 → 맛집 아님, 별점 없음 → DB `is_matjip`. */
+function isMatjipRestaurant(r) {
+  const rt = r.rating != null && r.rating !== '' ? parseInt(String(r.rating), 10) : NaN;
+  if (Number.isFinite(rt) && rt >= 4) return true;
+  if (Number.isFinite(rt) && rt <= 3) return false;
+  return Boolean(Number(r.is_matjip));
+}
+
+/** 점심 추천 카드 왼쪽 위 맛집 인증 스탬프 (외부 이미지 없이 CSS). */
+function matjipCertBadgeHtml() {
+  return `<span class="matjip-cert-badge" role="img" aria-label="맛집 인증">
+    <span class="matjip-cert-badge__check" aria-hidden="true">✓</span>
+    <span class="matjip-cert-badge__title">맛집</span>
+    <span class="matjip-cert-badge__sub">인증</span>
+  </span>`;
+}
+
+/** 식당 목록·점심 추천 카드 공통 내부 마크업 (제목·도보·카테고리·주소). */
+function buildListItemInnerHtml(r, opts = {}) {
+  const dist = r.distance_meters != null ? `약 ${r.distance_meters}m` : '';
+  const walk = r.walk_minutes != null ? `도보 약 ${r.walk_minutes}분` : '';
+  const walkHtml = walk ? `<span class="title-walk">${esc(walk)}</span>` : '';
+  const line2 = [r.address, dist].filter(Boolean).join(' · ');
+  const src = r.source === 'naver' ? 'naver' : 'user';
+  const badge =
+    src === 'naver'
+      ? '<span class="list-badge list-badge--naver" title="네이버 지역 검색">지도</span>'
+      : '<span class="list-badge list-badge--user" title="직접 등록">직접</span>';
+  const rate = ratingVisualHtml(r.rating);
+  const tailStars = rate ? `<span class="title-rating-inline">${rate}</span>` : '';
+  const matjipTag =
+    !opts.hideMatjipTag && isMatjipRestaurant(r) ? '<span class="list-matjip-tag">맛집</span>' : '';
+  return `
+      <div class="list-item-inner">
+        <div class="list-item-row title-row">
+          <span class="title-name-block title-name--grow"><span class="title-name">${esc(r.name)}</span>${walkHtml}</span>
+          <span class="title-category-rating">
+            <span class="muted">${esc(r.category)}</span>${matjipTag}${tailStars}
+          </span>
+          <span class="title-badge-wrap">${badge}</span>
+        </div>
+        <div class="list-item-row sub line-ellipsis">${line2 ? esc(line2) : '\u00a0'}</div>
+      </div>
+    `;
+}
+
 /**
  * 별점 줄: ⭐·☆ 버튼과 숫자 입력을 맞춥니다.
  */
-function setupRatingPicker(starRowId, numInputId) {
+function setupRatingPicker(starRowId, numInputId, matjipCheckboxId) {
   const row = document.getElementById(starRowId);
   const num = document.getElementById(numInputId);
+  const matjipCb = matjipCheckboxId ? document.getElementById(matjipCheckboxId) : null;
+
+  function syncMatjipFromRating() {
+    if (!matjipCb) return;
+    const v = getVal();
+    if (v != null && v >= 4) matjipCb.checked = true;
+    else if (v != null && v <= 3) matjipCb.checked = false;
+  }
   if (!row || !num) {
     return {
       setVal() {},
@@ -117,6 +171,7 @@ function setupRatingPicker(starRowId, numInputId) {
   function setVal(n) {
     num.value = n == null || n === '' ? '' : String(Math.min(5, Math.max(1, n)));
     redraw();
+    syncMatjipFromRating();
   }
 
   num.addEventListener('input', () => {
@@ -131,14 +186,23 @@ function setupRatingPicker(starRowId, numInputId) {
       if (n < 1) num.value = '1';
     }
     redraw();
+    syncMatjipFromRating();
   });
 
   redraw();
   return { setVal, redraw };
 }
 
-const addRatingPicker = setupRatingPicker('addStarRow', 'addRatingNum');
-const editRatingPicker = setupRatingPicker('editStarRow', 'editRatingNum');
+const addRatingPicker = setupRatingPicker('addStarRow', 'addRatingNum', 'addMatjip');
+const editRatingPicker = setupRatingPicker('editStarRow', 'editRatingNum', 'editMatjip');
+
+function resolveIsMatjipForSubmit(ratingRaw, matjipChecked) {
+  const r =
+    ratingRaw === '' || ratingRaw == null ? null : parseInt(String(ratingRaw).trim(), 10);
+  if (Number.isFinite(r) && r >= 4) return 1;
+  if (Number.isFinite(r) && r <= 3) return 0;
+  return matjipChecked ? 1 : 0;
+}
 
 // ---------------------------------------------------------------------------
 // 쿼리스트링 (필터·추천 조건 → 서버 req.query 와 맞추기)
@@ -147,10 +211,19 @@ const editRatingPicker = setupRatingPicker('editStarRow', 'editRatingNum');
 /** 식당 목록 현재 페이지 (검색·페이지 변경 시 조정). */
 let listPage = 1;
 
+/** 페이지 버튼에 한 번에 보여 줄 번호 개수 (1~10, 11~20 …). */
+const PAGER_WINDOW_SIZE = 10;
+
+/** `#listPager` 에 표시 중인 첫 페이지 번호 (1, 11, 21 …). */
+let listPagerWindowStart = 1;
+
+/** 화살표만 눌렀을 때 `renderListPager` 재호출용. */
+let listPagerMeta = { total: 0, page: 1, totalPages: 0 };
+
 /** `검색` 클릭 시 DOM에서 복사해 두는 조건. `listQueryString`은 여기만 참조합니다. */
 let listFilterApplied = {
   category: '',
-  within: '',
+  walk_filter: '',
   min_rating: '',
   matjip_only: false,
 };
@@ -162,7 +235,7 @@ function syncAppliedListFiltersFromDom() {
   const mj = $('#filterMatjipOnly');
   listFilterApplied = {
     category: cat ? String(cat.value || '') : '',
-    within: dist ? String(dist.value || '') : '',
+    walk_filter: dist ? String(dist.value || '') : '',
     min_rating: rate ? String(rate.value || '') : '',
     matjip_only: Boolean(mj && mj.checked),
   };
@@ -175,12 +248,37 @@ function listQueryString() {
   const p = new URLSearchParams();
   const f = listFilterApplied;
   if (f.category) p.set('category', f.category);
-  if (f.within) p.set('within_meters', f.within);
+  if (f.walk_filter) p.set('max_walk_minutes', f.walk_filter);
   if (f.min_rating) p.set('min_rating', f.min_rating);
   if (f.matjip_only) p.set('matjip_only', '1');
   p.set('page', String(listPage));
   p.set('limit', '5');
   return `?${p.toString()}`;
+}
+
+/** 오늘 점심 추천 — 별점 필터 옵션. 맛집 체크 시 4·5점만 노출. */
+const PICK_RATING_OPTIONS = [
+  { value: '', label: '전체 (별점 무관)' },
+  { value: '1', label: '⭐ 1점 이상' },
+  { value: '2', label: '⭐ 2점 이상' },
+  { value: '3', label: '⭐ 3점 이상' },
+  { value: '4', label: '⭐ 4점 이상' },
+  { value: '5', label: '⭐ 5점' },
+];
+
+/** `#pickMatjipOnly` 에 따라 `#pickRating` 옵션을 4·5점만 / 1~5 전체로 바꿉니다. */
+function syncPickRatingSelect() {
+  const sel = $('#pickRating');
+  if (!sel) return;
+  const matjip = Boolean($('#pickMatjipOnly')?.checked);
+  const prev = sel.value;
+  const list = matjip
+    ? PICK_RATING_OPTIONS.filter((o) => o.value === '' || o.value === '4' || o.value === '5')
+    : PICK_RATING_OPTIONS;
+  sel.innerHTML = list
+    .map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`)
+    .join('');
+  sel.value = list.some((o) => o.value === prev) ? prev : '';
 }
 
 /**
@@ -190,8 +288,8 @@ function pickQueryString() {
   const p = new URLSearchParams();
   const cat = $('#pickCat').value;
   if (cat) p.set('category', cat);
-  const within = $('#pickDistance').value;
-  if (within) p.set('within_meters', within);
+  const walkFilter = $('#pickDistance').value;
+  if (walkFilter) p.set('max_walk_minutes', walkFilter);
   const minR = $('#pickRating').value;
   if (minR) p.set('min_rating', minR);
   if ($('#pickMatjipOnly').checked) p.set('matjip_only', '1');
@@ -211,8 +309,11 @@ const FOOD_CATEGORIES = [
   "일식",
   "중식",
   "분식",
+  "치킨",
+  "피자",
   "카페",
   "뷔페",
+  "요리주점",
   "기타",
 ];
 
@@ -306,20 +407,60 @@ async function loadCategories() {
 // 목록·수정·추천 UI
 // ---------------------------------------------------------------------------
 
+function alignPagerWindowToPage(page, totalPages) {
+  if (totalPages < 1) {
+    listPagerWindowStart = 1;
+    return;
+  }
+  if (page < listPagerWindowStart) {
+    listPagerWindowStart =
+      Math.floor((page - 1) / PAGER_WINDOW_SIZE) * PAGER_WINDOW_SIZE + 1;
+  } else if (page > listPagerWindowStart + PAGER_WINDOW_SIZE - 1) {
+    listPagerWindowStart =
+      Math.floor((page - 1) / PAGER_WINDOW_SIZE) * PAGER_WINDOW_SIZE + 1;
+  }
+  const maxStart = Math.max(1, totalPages - PAGER_WINDOW_SIZE + 1);
+  if (listPagerWindowStart > maxStart) listPagerWindowStart = maxStart;
+}
+
+function appendPagerArrow(nav, symbol, label, disabled, onClick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'pager-btn pager-btn--arrow';
+  b.textContent = symbol;
+  b.setAttribute('aria-label', label);
+  b.disabled = disabled;
+  if (!disabled) b.addEventListener('click', onClick);
+  nav.appendChild(b);
+}
+
 /**
- * 총 건수가 2페이지 이상일 때만 1,2,3… 버튼을 그립니다.
+ * 총 건수가 2페이지 이상일 때만 페이지 버튼을 그립니다.
+ * 번호는 10개씩(1~10, 11~20 …), 앞뒤 화살표로 묶음 이동.
  */
 function renderListPager(total, page, totalPages) {
   const nav = $('#listPager');
   if (!nav) return;
+  listPagerMeta = { total, page, totalPages };
   if (total < 1 || totalPages < 2) {
     nav.innerHTML = '';
     nav.hidden = true;
     return;
   }
+  alignPagerWindowToPage(page, totalPages);
+  const windowEnd = Math.min(listPagerWindowStart + PAGER_WINDOW_SIZE - 1, totalPages);
+  const canPrevWindow = listPagerWindowStart > 1;
+  const canNextWindow = windowEnd < totalPages;
+
   nav.hidden = false;
   nav.innerHTML = '';
-  for (let p = 1; p <= totalPages; p++) {
+
+  appendPagerArrow(nav, '‹', '이전 페이지 묶음', !canPrevWindow, () => {
+    listPagerWindowStart = Math.max(1, listPagerWindowStart - PAGER_WINDOW_SIZE);
+    renderListPager(listPagerMeta.total, listPagerMeta.page, listPagerMeta.totalPages);
+  });
+
+  for (let p = listPagerWindowStart; p <= windowEnd; p++) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'pager-btn' + (p === page ? ' is-active' : '');
@@ -334,6 +475,13 @@ function renderListPager(total, page, totalPages) {
     });
     nav.appendChild(b);
   }
+
+  appendPagerArrow(nav, '›', '다음 페이지 묶음', !canNextWindow, () => {
+    listPagerWindowStart += PAGER_WINDOW_SIZE;
+    const maxStart = Math.max(1, totalPages - PAGER_WINDOW_SIZE + 1);
+    if (listPagerWindowStart > maxStart) listPagerWindowStart = maxStart;
+    renderListPager(listPagerMeta.total, listPagerMeta.page, listPagerMeta.totalPages);
+  });
 }
 
 /**
@@ -357,10 +505,11 @@ async function loadList() {
 
   const ul = $('#list');
   const empty = $('#empty');
-  $('#count').textContent =
+  let countText =
     total === 0
       ? '총 0곳'
       : `총 ${total}곳 (${page}/${Math.max(totalPages, 1)}페이지)`;
+  $('#count').textContent = countText;
 
   ul.innerHTML = '';
   renderListPager(total, page, totalPages);
@@ -373,43 +522,14 @@ async function loadList() {
 
   for (const r of rows) {
     const li = document.createElement('li');
-    li.className = 'list-item-clickable';
+    const isMatjip = isMatjipRestaurant(r);
+    li.className = isMatjip ? 'list-item-clickable list-item--matjip' : 'list-item-clickable';
     li.tabIndex = 0;
     li.dataset.id = String(r.id);
     li.setAttribute('role', 'button');
     li.setAttribute('aria-label', `${r.name} 수정`);
-    const walk = r.walk_minutes != null ? `도보 약 ${r.walk_minutes}분` : '';
-    const line2 = [r.address, walk].filter(Boolean).join(' · ');
-    const src = r.source === 'naver' ? 'naver' : 'user';
-    const badge =
-      src === 'naver'
-        ? '<span class="list-badge list-badge--naver" title="네이버 지역 검색">지도</span>'
-        : '<span class="list-badge list-badge--user" title="직접 등록">직접</span>';
-    const rate = ratingVisualHtml(r.rating);
-    const memoLine = r.memo ? esc(r.memo) : '\u00a0';
-    const tailStars = rate ? `<span class="title-rating-inline">${rate}</span>` : '';
-    const matjipTag = Number(r.is_matjip) ? '<span class="list-matjip-tag">맛집</span>' : '';
-    li.innerHTML = `
-      <div class="list-item-inner">
-        <div class="list-item-row title-row">
-          <span class="title-name title-name--grow">${esc(r.name)}</span>
-          <span class="title-category-rating">
-            <span class="muted">${esc(r.category)}</span>${matjipTag}${tailStars}
-          </span>
-          <span class="title-badge-wrap">${badge}</span>
-        </div>
-        <div class="list-item-row sub line-ellipsis">${line2 ? esc(line2) : '\u00a0'}</div>
-        <div class="list-item-row sub line-ellipsis memo-line">${memoLine}</div>
-      </div>
-    `;
-    const open = () => openEdit(r.id);
-    li.addEventListener('click', open);
-    li.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter' || ev.key === ' ') {
-        ev.preventDefault();
-        open();
-      }
-    });
+    li.innerHTML = (isMatjip ? matjipCertBadgeHtml() : '') + buildListItemInnerHtml(r, { hideMatjipTag: isMatjip });
+    bindListItemOpen(li, r.id);
     ul.appendChild(li);
   }
 }
@@ -430,25 +550,64 @@ async function openEdit(id) {
   $('#editMemo').value = r.memo ?? '';
   const rt = r.rating != null && r.rating !== '' ? parseInt(String(r.rating), 10) : null;
   editRatingPicker.setVal(Number.isFinite(rt) && rt >= 1 && rt <= 5 ? rt : null);
-  $('#editMatjip').checked = Boolean(Number(r.is_matjip));
+  $('#editMatjip').checked = isMatjipRestaurant(r);
+  const geoHint = $('#editGeoHint');
+  if (geoHint) {
+    const ref = r.reference_location;
+    const hasPlace = r.latitude != null && r.longitude != null;
+    const hasDist = r.distance_meters != null;
+    if (ref && ref.latitude != null && ref.longitude != null && (hasPlace || hasDist)) {
+      let t = `기준점(내 위치·.env): 위 ${Number(ref.latitude).toFixed(5)}, 경 ${Number(ref.longitude).toFixed(5)}.`;
+      if (hasPlace) {
+        t += ` 이 식당: 위 ${Number(r.latitude).toFixed(5)}, 경 ${Number(r.longitude).toFixed(5)}.`;
+      }
+      if (hasDist) {
+        t += ` 직선 약 ${r.distance_meters}m.`;
+      }
+      geoHint.textContent = t;
+      geoHint.hidden = false;
+    } else {
+      geoHint.textContent = '';
+      geoHint.hidden = true;
+    }
+  }
   showEdit();
 }
 
+function bindListItemOpen(li, id) {
+  const open = () => openEdit(id);
+  li.addEventListener('click', open);
+  li.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') {
+      ev.preventDefault();
+      open();
+    }
+  });
+}
+
 /**
- * 추천 API 결과 한 건을 `#pickResult` 영역에 표시합니다.
+ * 추천 API 결과 한 건을 `#pickResult` 영역에 표시합니다 (식당 목록과 같은 박스·카드).
  */
 function showPick(r) {
   const box = $('#pickResult');
+  const isMatjip = isMatjipRestaurant(r);
+  const matjipCert = isMatjip ? matjipCertBadgeHtml() : '';
+  const cardClass = isMatjip
+    ? 'list-item-clickable pick-result-card list-item--matjip'
+    : 'list-item-clickable pick-result-card';
   box.hidden = false;
-  const walk = r.walk_minutes != null ? `도보 약 ${r.walk_minutes}분 · ` : '';
-  const addr = r.address ? `${esc(r.address)} · ` : '';
-  const rate = ratingVisualHtml(r.rating);
-  const matjipLine = Number(r.is_matjip) ? '<span class="list-matjip-tag">맛집</span> · ' : '';
   box.innerHTML = `
-    <strong>${esc(r.name)}</strong>
-    <div class="meta">${matjipLine}${esc(r.category)} · ${addr}${walk}${rate ? `${rate} · ` : ''}행복한 식사 되세요</div>
-    ${r.memo ? `<div class="meta" style="margin-top:0.5rem">${esc(r.memo)}</div>` : ''}
+    <div class="list-browse-panel pick-result-panel">
+      <ul class="list pick-result-list">
+        <li class="${cardClass}" data-id="${esc(String(r.id))}" role="button" tabindex="0" aria-label="${esc(r.name)} 수정">
+          ${matjipCert}
+          ${buildListItemInnerHtml(r, { hideMatjipTag: isMatjip })}
+        </li>
+      </ul>
+    </div>
   `;
+  const li = box.querySelector('.pick-result-card');
+  if (li && r.id != null) bindListItemOpen(li, r.id);
 }
 
 /**
@@ -459,8 +618,13 @@ async function doPick() {
     const r = await fetchJSON(`/api/restaurants/pick${pickQueryString()}`);
     showPick(r);
   } catch (e) {
-    $('#pickResult').hidden = false;
-    $('#pickResult').innerHTML = `<div class="meta">${esc(e.message)}</div>`;
+    const box = $('#pickResult');
+    box.hidden = false;
+    box.innerHTML = `
+      <div class="list-browse-panel pick-result-panel">
+        <p class="muted empty-msg--panel">${esc(e.message)}</p>
+      </div>
+    `;
   }
 }
 
@@ -498,26 +662,78 @@ function showEdit() {
 // 이벤트 연결 — DOM 노드에 `addEventListener`로 콜백을 붙입니다.
 // ---------------------------------------------------------------------------
 
+const SYNC_MSG_LOADING = '주변 식당 받는 중…';
+const SYNC_MSG_DONE = '최신화 완료';
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** 주변 식당 최신화 중 전체 화면 로딩(스크롤·클릭 차단). */
+function showSyncLoading() {
+  const el = $('#syncLoadingOverlay');
+  const msg = $('#syncLoadingMsg');
+  const dots = $('#syncLoadingDots');
+  if (!el) return;
+  el.classList.remove('sync-loading-overlay--done');
+  if (msg) msg.textContent = SYNC_MSG_LOADING;
+  if (dots) dots.hidden = false;
+  el.hidden = false;
+  el.setAttribute('aria-hidden', 'false');
+  el.setAttribute('aria-busy', 'true');
+  document.body.classList.add('sync-loading-active');
+}
+
+function showSyncLoadingComplete() {
+  const el = $('#syncLoadingOverlay');
+  const msg = $('#syncLoadingMsg');
+  const dots = $('#syncLoadingDots');
+  if (el) {
+    el.classList.add('sync-loading-overlay--done');
+    el.setAttribute('aria-busy', 'false');
+  }
+  if (msg) msg.textContent = SYNC_MSG_DONE;
+  if (dots) dots.hidden = true;
+}
+
+function hideSyncLoading() {
+  const el = $('#syncLoadingOverlay');
+  const msg = $('#syncLoadingMsg');
+  const dots = $('#syncLoadingDots');
+  if (!el) return;
+  el.classList.remove('sync-loading-overlay--done');
+  if (msg) msg.textContent = SYNC_MSG_LOADING;
+  if (dots) dots.hidden = false;
+  el.hidden = true;
+  el.setAttribute('aria-hidden', 'true');
+  el.setAttribute('aria-busy', 'false');
+  document.body.classList.remove('sync-loading-active');
+}
+
 /**
- * 네이버 지역 검색으로 넣었던 행(`source=naver`)만 삭제 후 다시 수입합니다. 직접 등록한 행은 그대로 둡니다.
+ * 네이버 지역 검색으로 새 식당만 추가합니다. 이름+좌표가 같으면 기존 데이터는 그대로 둡니다.
  * 서버의 `POST /api/restaurants/sync-naver` 가 `.env` 의 NAVER_* 와 NAVER_IMPORT_QUERIES 를 사용합니다.
  */
 async function syncNaverFromWeb() {
   const btn = $('#btnSyncNaver');
-  btn.disabled = true;
+  if (btn?.disabled) return;
+  showSyncLoading();
+  if (btn) btn.disabled = true;
   try {
-    const out = await fetchJSON('/api/restaurants/sync-naver', { method: 'POST' });
-    alert(`네이버 데이터 갱신: 삭제 ${out.deleted}건, 새로 추가 ${out.insertedTotal}건`);
-    await loadCategories();
-    await loadList();
+    await fetchJSON('/api/restaurants/sync-naver', { method: 'POST' });
+    showSyncLoadingComplete();
+    await Promise.all([loadCategories(), loadList(), sleep(1000)]);
   } catch (e) {
     alert(e.message);
   } finally {
-    btn.disabled = false;
+    hideSyncLoading();
+    if (btn) btn.disabled = false;
   }
 }
 
 $('#btnPick').addEventListener('click', doPick);
+const pickMatjipOnlyEl = $('#pickMatjipOnly');
+if (pickMatjipOnlyEl) pickMatjipOnlyEl.addEventListener('change', syncPickRatingSelect);
 $('#btnGoList').addEventListener('click', async () => {
   const block = $('#homeListBlock');
   const btn = $('#btnGoList');
@@ -542,6 +758,7 @@ $('#btnGoList').addEventListener('click', async () => {
 });
 $('#btnListSearch').addEventListener('click', async () => {
   listPage = 1;
+  listPagerWindowStart = 1;
   syncAppliedListFiltersFromDom();
   try {
     await loadList();
@@ -573,7 +790,7 @@ $('#formAdd').addEventListener('submit', async (ev) => {
       const v = fd.get('rating');
       return v === '' || v == null ? null : v;
     })(),
-    is_matjip: fd.get('is_matjip') === '1' ? 1 : 0,
+    is_matjip: resolveIsMatjipForSubmit(fd.get('rating'), fd.get('is_matjip') === '1'),
   };
   try {
     await fetchJSON('/api/restaurants', {
@@ -588,6 +805,7 @@ $('#formAdd').addEventListener('submit', async (ev) => {
     const am = $('#addMatjip');
     if (am) am.checked = false;
     listPage = 1;
+    listPagerWindowStart = 1;
     await loadCategories();
     await loadList();
     showHome();
@@ -613,7 +831,7 @@ $('#formEdit').addEventListener('submit', async (ev) => {
       const v = fd.get('rating');
       return v === '' || v == null ? null : v;
     })(),
-    is_matjip: fd.get('is_matjip') === '1' ? 1 : 0,
+    is_matjip: resolveIsMatjipForSubmit(fd.get('rating'), fd.get('is_matjip') === '1'),
   };
   try {
     await fetchJSON(`/api/restaurants/${id}`, {
@@ -669,6 +887,7 @@ $('#btnEditDelete').addEventListener('click', async () => {
 
   try {
     await loadCategories();
+    syncPickRatingSelect();
     syncAppliedListFiltersFromDom();
     await loadList();
   } catch (e) {

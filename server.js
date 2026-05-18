@@ -12,7 +12,13 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2/promise");
-const { parseQueriesFromEnv, runNaverImportForQueries } = require("./lib/naverImport.js");
+const path = require("path");
+const {
+  parseQueriesFromEnv,
+  runNaverImportForQueries,
+  parseReferenceLatLngFromEnv,
+} = require("./lib/naverImport.js");
+const { isTmapWalkEnabled } = require("./lib/tmapWalk.js");
 
 /** 화면·API에서 허용하는 음식 종류(프론트 `FOOD_CATEGORIES` 와 동일해야 함). */
 const FOOD_CATEGORIES = [
@@ -22,8 +28,11 @@ const FOOD_CATEGORIES = [
   "일식",
   "중식",
   "분식",
+  "치킨",
+  "피자",
   "카페",
   "뷔페",
+  "요리주점",
   "기타",
 ];
 
@@ -57,6 +66,20 @@ function parseRatingOptional(rating, res) {
 function parseIsMatjipBody(val) {
   if (val === true || val === 1 || val === "1") return 1;
   return 0;
+}
+
+/** 별점 4점 이상 → 맛집, 3점 이하 → 맛집 해제, 별점 없음 → 맛집 체크값 따름. */
+const MATJIP_AUTO_RATING_MIN = 4;
+const MATJIP_AUTO_RATING_CLEAR_MAX = 3;
+
+function matjipMatchSql() {
+  return `((rating IS NOT NULL AND rating >= ${MATJIP_AUTO_RATING_MIN}) OR (is_matjip = 1 AND rating IS NULL))`;
+}
+
+function resolveIsMatjip(ratingVal, isMatjipBody) {
+  if (ratingVal != null && ratingVal >= MATJIP_AUTO_RATING_MIN) return 1;
+  if (ratingVal != null && ratingVal <= MATJIP_AUTO_RATING_CLEAR_MAX) return 0;
+  return parseIsMatjipBody(isMatjipBody);
 }
 
 function queryMatjipOnly(raw) {
@@ -113,14 +136,48 @@ async function getPool() {
 }
 
 /**
- * UI의 거리 필터(100m/300m/600m)를 DB 조건에 쓸 “도보 최대 분” 숫자로 바꿉니다.
+ * 도보 시간 필터: `max_walk_minutes` = 10 | 20 | 30 | gte30
+ * - 10/20/30 → `walk_minutes` 가 각각 10·20·30분 **미만** (`<`)
+ * - gte30 → 30분 **이상** (`>=`)
+ * 하위 호환: `gte20`→30분 이상, `within_meters` 100/300/600→10/20/30분 미만, `5`→10분 미만.
  */
-function maxWalkMinutesForWithinMeters(withinMeters) {
-  const n = parseInt(String(withinMeters ?? ""), 10);
-  if (n === 100) return 2;
-  if (n === 300) return 5;
-  if (n === 600) return 10;
-  return null;
+function parseWalkFilterFromQuery(query) {
+  const raw = query.max_walk_minutes ?? query.within_meters;
+  const v = String(raw ?? "").trim();
+  if (!v) return { walkLessThan: null, walkGte: null };
+  if (v === "gte30" || v === "gte20" || v === "30plus" || v === "30+" || v === "20plus" || v === "20+") {
+    return { walkLessThan: null, walkGte: 30 };
+  }
+  if (v === "100") return { walkLessThan: 10, walkGte: null };
+  if (v === "300") return { walkLessThan: 20, walkGte: null };
+  if (v === "600") return { walkLessThan: 30, walkGte: null };
+  const n = parseInt(v, 10);
+  if (n === 5) return { walkLessThan: 10, walkGte: null };
+  if (n === 10) return { walkLessThan: 10, walkGte: null };
+  if (n === 20) return { walkLessThan: 20, walkGte: null };
+  if (n === 30) return { walkLessThan: 30, walkGte: null };
+  return { walkLessThan: null, walkGte: null };
+}
+
+function applyWalkFilterSql(conds, params, walkFilter) {
+  if (walkFilter.walkLessThan != null) {
+    conds.push("walk_minutes IS NOT NULL AND walk_minutes < ?");
+    params.push(walkFilter.walkLessThan);
+  }
+  if (walkFilter.walkGte != null) {
+    conds.push("walk_minutes IS NOT NULL AND walk_minutes >= ?");
+    params.push(walkFilter.walkGte);
+  }
+}
+
+/**
+ * `.env` 의 NAVER_REFERENCE_LAT/LNG 를 API JSON에 넣을 형태로 돌려줍니다.
+ * [용도] 각 행의 `latitude`/`longitude`는 **식당** 좌표이고, 이 값은 **내 위치(기준점)** 입니다.
+ */
+function referenceLocationJson() {
+  const ref = parseReferenceLatLngFromEnv();
+  if (!ref) return null;
+  return { latitude: ref.lat, longitude: ref.lng };
 }
 
 /**
@@ -138,12 +195,13 @@ app.get("/api/health", async (_req, res) => {
 });
 
 /**
- * GET /api/restaurants — 맛집 목록(페이지). 쿼리: `category`, `within_meters`, `min_rating`, `matjip_only`, `page`, `limit`.
- * 응답: `{ items, total, page, pageSize, totalPages }`. 정렬은 `user_touched_at`·`category`·`name` 규칙 동일.
+ * GET /api/restaurants — 맛집 목록(페이지). 쿼리: `category`, `max_walk_minutes`, `min_rating`, `matjip_only`, `page`, `limit`.
+ * 응답: `{ items, total, page, pageSize, totalPages }`. `reference_location` 은 `.env` 기준점(내 위치) 위·경도, 각 item 의 `latitude`/`longitude` 는 **식당** 좌표, `distance_meters`/`walk_minutes` 는 기준점에서 식당까지입니다.
+ * 정렬은 `user_touched_at`·`category`·`name` 규칙 동일.
  */
 app.get("/api/restaurants", async (req, res) => {
   const category = req.query.category;
-  const maxWalk = maxWalkMinutesForWithinMeters(req.query.within_meters);
+  const walkFilter = parseWalkFilterFromQuery(req.query);
   const minRatingRaw = req.query.min_rating;
   let minRating = null;
   if (minRatingRaw != null && String(minRatingRaw).trim() !== "") {
@@ -168,16 +226,13 @@ app.get("/api/restaurants", async (req, res) => {
     conds.push("category = ?");
     params.push(String(category).trim());
   }
-  if (maxWalk != null) {
-    conds.push("(walk_minutes IS NULL OR walk_minutes <= ?)");
-    params.push(maxWalk);
-  }
+  applyWalkFilterSql(conds, params, walkFilter);
   if (minRating != null) {
     conds.push("rating >= ?");
     params.push(minRating);
   }
   if (matjipOnly) {
-    conds.push("is_matjip = 1");
+    conds.push(matjipMatchSql());
   }
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
 
@@ -186,17 +241,26 @@ app.get("/api/restaurants", async (req, res) => {
     const [countRows] = await p.query(`SELECT COUNT(*) AS cnt FROM restaurants ${where}`, params);
     const total = Number(countRows[0]?.cnt ?? 0);
     if (total === 0) {
-      return res.json({ items: [], total: 0, page: 1, pageSize: limit, totalPages: 0 });
+      return res.json({
+        reference_location: referenceLocationJson(),
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: limit,
+        totalPages: 0,
+      });
     }
     const totalPages = Math.ceil(total / limit);
     if (page > totalPages) page = totalPages;
 
     const offsetClamped = (page - 1) * limit;
-    const listSql = `SELECT id, name, category, address, walk_minutes, memo, rating, is_matjip, source, created_at, user_touched_at
+    const listSql = `SELECT id, name, category, address, walk_minutes, memo, rating, is_matjip, source, created_at, user_touched_at,
+      latitude, longitude, distance_meters
       FROM restaurants ${where} ${orderList} LIMIT ? OFFSET ?`;
     const [recordset] = await p.query(listSql, [...params, limit, offsetClamped]);
 
     res.json({
+      reference_location: referenceLocationJson(),
       items: recordset,
       total,
       page,
@@ -228,11 +292,11 @@ app.get("/api/restaurants/categories", async (_req, res) => {
 
 /**
  * GET /api/restaurants/pick — 조건에 맞는 행 중 무작위 한 건을 골라 JSON으로 반환합니다. 없으면 404.
- * 쿼리: `category`, `within_meters`, `min_rating`, `matjip_only`(1/true면 is_matjip=1 만).
+ * 쿼리: `category`, `max_walk_minutes`, `min_rating`, `matjip_only`(1/true면 is_matjip=1 만). 응답에 `latitude`·`longitude`·`distance_meters` 포함.
  */
 app.get("/api/restaurants/pick", async (req, res) => {
   const category = req.query.category;
-  const maxWalk = maxWalkMinutesForWithinMeters(req.query.within_meters);
+  const walkFilter = parseWalkFilterFromQuery(req.query);
   const minRatingRaw = req.query.min_rating;
   let minRating = null;
   if (minRatingRaw != null && String(minRatingRaw).trim() !== "") {
@@ -250,19 +314,17 @@ app.get("/api/restaurants/pick", async (req, res) => {
       conds.push("category = ?");
       params.push(String(category).trim());
     }
-    if (maxWalk != null) {
-      conds.push("(walk_minutes IS NULL OR walk_minutes <= ?)");
-      params.push(maxWalk);
-    }
+    applyWalkFilterSql(conds, params, walkFilter);
     if (minRating != null) {
       conds.push("rating >= ?");
       params.push(minRating);
     }
     if (matjipOnly) {
-      conds.push("is_matjip = 1");
+      conds.push(matjipMatchSql());
     }
     const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
-    const queryText = `SELECT id, name, category, address, walk_minutes, memo, rating, is_matjip, source FROM restaurants ${where}`;
+    const queryText = `SELECT id, name, category, address, walk_minutes, memo, rating, is_matjip, source,
+      latitude, longitude, distance_meters FROM restaurants ${where}`;
 
     const [rows] = await p.query(queryText, params);
     if (!rows.length) {
@@ -272,7 +334,7 @@ app.get("/api/restaurants/pick", async (req, res) => {
       });
     }
     const pick = rows[Math.floor(Math.random() * rows.length)];
-    res.json(pick);
+    res.json({ ...pick, reference_location: referenceLocationJson() });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "DB 오류", detail: e.message });
@@ -302,7 +364,7 @@ app.post("/api/restaurants", async (req, res) => {
   if (catFinal == null) return;
   const ratingVal = parseRatingOptional(rating, res);
   if (ratingVal === undefined) return;
-  const matjipVal = parseIsMatjipBody(is_matjip);
+  const matjipVal = resolveIsMatjip(ratingVal, is_matjip);
   try {
     const p = await getPool();
     const memoVal =
@@ -339,13 +401,13 @@ app.get("/api/restaurants/:id", async (req, res) => {
   try {
     const p = await getPool();
     const [recordset] = await p.query(
-      "SELECT id, name, category, address, walk_minutes, memo, rating, is_matjip, source, created_at, user_touched_at FROM restaurants WHERE id = ?",
+      "SELECT id, name, category, address, walk_minutes, memo, rating, is_matjip, source, created_at, user_touched_at, latitude, longitude, distance_meters FROM restaurants WHERE id = ?",
       [id],
     );
     if (!recordset.length) {
       return res.status(404).json({ error: "맛집을 찾을 수 없습니다." });
     }
-    res.json(recordset[0]);
+    res.json({ ...recordset[0], reference_location: referenceLocationJson() });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "DB 오류", detail: e.message });
@@ -369,7 +431,7 @@ app.put("/api/restaurants/:id", async (req, res) => {
   if (catFinal == null) return;
   const ratingVal = parseRatingOptional(rating, res);
   if (ratingVal === undefined) return;
-  const matjipVal = parseIsMatjipBody(is_matjip);
+  const matjipVal = resolveIsMatjip(ratingVal, is_matjip);
   try {
     const p = await getPool();
     const walk =
@@ -424,23 +486,51 @@ app.delete("/api/restaurants/:id", async (req, res) => {
 });
 
 /**
- * POST /api/restaurants/sync-naver — `source=naver` 행만 삭제한 뒤, 네이버 지역 검색으로 다시 채웁니다.
- * 직접 등록(`source=user`) 행은 건드리지 않습니다. `.env` 의 NAVER_IMPORT_QUERIES·키가 필요합니다.
+ * POST /api/restaurants/sync-naver — 네이버 지역 검색으로 새 식당만 추가합니다.
+ * 이름+좌표가 같으면 기존 행은 그대로 두고 TMAP·UPDATE 를 하지 않습니다. `source=user` 는 덮어쓰지 않습니다.
  */
 app.post("/api/restaurants/sync-naver", async (_req, res) => {
+  require("dotenv").config({ path: path.join(__dirname, ".env") });
   const queries = parseQueriesFromEnv();
   if (!queries.length) {
     return res.status(400).json({
       error: "NAVER_IMPORT_QUERIES 가 비어 있습니다. .env 에 검색어를 쉼표로 넣어 주세요.",
     });
   }
+  if (!parseReferenceLatLngFromEnv()) {
+    return res.status(400).json({
+      error:
+        "NAVER_REFERENCE_LAT, NAVER_REFERENCE_LNG(회사 출발지)가 필요합니다. 도보 시간 계산에 쓰입니다.",
+    });
+  }
   try {
     const p = await getPool();
-    const [delResult] = await p.query("DELETE FROM restaurants WHERE source = ?", ["naver"]);
-    const deleted = delResult.affectedRows ?? 0;
-    const summary = await runNaverImportForQueries(p, queries);
+    const { summary, walkFill } = await runNaverImportForQueries(p, queries);
     const insertedTotal = summary.reduce((acc, row) => acc + (row.inserted || 0), 0);
-    res.json({ ok: true, deleted, insertedTotal, summary });
+    const unchangedTotal = summary.reduce((acc, row) => acc + (row.unchanged || 0), 0);
+    const skippedTotal = summary.reduce((acc, row) => acc + (row.skipped || 0), 0);
+    const [countRows] = await p.query(
+      "SELECT COUNT(*) AS c FROM restaurants WHERE source = ?",
+      ["naver"],
+    );
+    const naverTotal = Number(countRows[0]?.c ?? 0);
+    const [walkNullRows] = await p.query(
+      `SELECT COUNT(*) AS c FROM restaurants WHERE source = ? AND walk_minutes IS NULL
+       AND latitude IS NOT NULL AND longitude IS NOT NULL`,
+      ["naver"],
+    );
+    const walkMinutesMissing = Number(walkNullRows[0]?.c ?? 0);
+    res.json({
+      ok: true,
+      insertedTotal,
+      unchangedTotal,
+      skippedTotal,
+      naverTotal,
+      tmapWalk: isTmapWalkEnabled(),
+      walkFill,
+      walkMinutesMissing,
+      summary,
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "동기화 실패", detail: e.message });

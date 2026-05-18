@@ -51,13 +51,14 @@
             </button>
           </div>
           <div class="pick-stack pick-filters-inset">
-            <label class="field-label" for="pickDistance">거리</label>
+            <label class="field-label" for="pickDistance">도보 시간</label>
             <div class="pick-distance-row">
               <select id="pickDistance" class="pick-distance-select">
                 <option value="">제한 없음</option>
-                <option value="100">100m (약 2분)</option>
-                <option value="300">300m (약 5분)</option>
-                <option value="600">600m (약 10분)</option>
+                <option value="10">10분 미만</option>
+                <option value="20">20분 미만</option>
+                <option value="30">30분 미만</option>
+                <option value="gte30">30분 이상</option>
               </select>
               <label
                 class="pick-matjip-toggle toggle-stamp"
@@ -74,9 +75,7 @@
                 </span>
               </label>
             </div>
-            <p class="field-hint">
-              괄호 안은 시속 약 4km로 걸을 때 도보 예상 시간이에요.
-            </p>
+            <p class="field-hint">조건에 맞는 식당 중 하나를 무작위로 골라줘요.</p>
             <label class="field-label" for="pickCat">음식 종류</label>
             <select id="pickCat" class="field-full">
               <option value="">전체에서 골라줘</option>
@@ -91,7 +90,7 @@
               <option value="5">⭐ 5점</option>
             </select>
           </div>
-          <div id="pickResult" class="pick-result" hidden></div>
+          <div id="pickResult" class="pick-result-wrap" hidden></div>
         </section>
 
         <div class="home-pick-actions">
@@ -121,13 +120,14 @@
               </div>
             </div>
             <div class="pick-stack pick-filters-inset">
-              <label class="field-label" for="filterDistance">거리</label>
+              <label class="field-label" for="filterDistance">도보 시간</label>
               <div class="pick-distance-row">
                 <select id="filterDistance" class="pick-distance-select">
                   <option value="">제한 없음</option>
-                  <option value="100">100m (약 2분)</option>
-                  <option value="300">300m (약 5분)</option>
-                  <option value="600">600m (약 10분)</option>
+                  <option value="10">10분 미만</option>
+                  <option value="20">20분 미만</option>
+                  <option value="30">30분 미만</option>
+                  <option value="gte30">30분 이상</option>
                 </select>
                 <label
                   class="pick-matjip-toggle toggle-stamp"
@@ -144,9 +144,6 @@
                   </span>
                 </label>
               </div>
-              <p class="field-hint">
-                괄호 안은 시속 약 4km로 걸을 때 도보 예상 시간이에요.
-              </p>
               <label class="field-label" for="filterCat">음식 종류</label>
               <select id="filterCat" class="field-full">
                 <option value="">전체에서 골라줘</option>
@@ -160,9 +157,6 @@
                 <option value="4">⭐ 4점 이상</option>
                 <option value="5">⭐ 5점</option>
               </select>
-              <p class="field-hint">
-                조건을 고른 뒤 위의 검색을 누르면 그 기준으로 목록이 바뀝니다.
-              </p>
             </div>
             <div class="list-browse-panel">
               <ul id="list" class="list"></ul>
@@ -202,6 +196,7 @@
           </button>
           <h2 class="sub-title">맛집 수정</h2>
           <p class="sub-tagline">정보를 바꾼 뒤 저장해 주세요</p>
+          <p id="editGeoHint" class="field-hint" hidden></p>
         </header>
 
         <section class="card">
@@ -235,6 +230,30 @@
                   </span>
                 </label>
               </div>
+              <label class="full form-rating-block">
+                별점 (최대 5점)
+                <div class="rating-row">
+                  <div
+                    id="editStarRow"
+                    class="star-row"
+                    role="group"
+                    aria-label="별점 선택"
+                  ></div>
+                  <input
+                    type="number"
+                    name="rating"
+                    id="editRatingNum"
+                    class="rating-num-input"
+                    min="1"
+                    max="5"
+                    step="1"
+                    placeholder="1~5"
+                  />
+                </div>
+                <p class="field-hint field-hint--compact">
+                  4점 이상이면 맛집 자동 체크, 3점 이하면 해제됩니다.
+                </p>
+              </label>
               <label class="full">
                 도보 (분)
                 <input
@@ -262,30 +281,6 @@
                 <select name="category" id="editCategory" class="filter-select">
                   <option value="기타">기타</option>
                 </select>
-              </label>
-              <label class="full">
-                별점 (최대 5점)
-                <div class="rating-row">
-                  <div
-                    id="editStarRow"
-                    class="star-row"
-                    role="group"
-                    aria-label="별점 선택"
-                  ></div>
-                  <input
-                    type="number"
-                    name="rating"
-                    id="editRatingNum"
-                    class="rating-num-input"
-                    min="1"
-                    max="5"
-                    step="1"
-                    placeholder="1~5"
-                  />
-                </div>
-                <p class="field-hint">
-                  ⭐·☆을 누르거나 옆에 숫자를 입력하세요. 비우면 별점 없음.
-                </p>
               </label>
               <label class="full">
                 메모
@@ -356,6 +351,30 @@
                   </span>
                 </label>
               </div>
+              <label class="full form-rating-block">
+                별점 (최대 5점)
+                <div class="rating-row">
+                  <div
+                    id="addStarRow"
+                    class="star-row"
+                    role="group"
+                    aria-label="별점 선택"
+                  ></div>
+                  <input
+                    type="number"
+                    name="rating"
+                    id="addRatingNum"
+                    class="rating-num-input"
+                    min="1"
+                    max="5"
+                    step="1"
+                    placeholder="1~5"
+                  />
+                </div>
+                <p class="field-hint field-hint--compact">
+                  4점 이상이면 맛집 자동 체크, 3점 이하면 해제됩니다.
+                </p>
+              </label>
               <label class="full">
                 도보 (분)
                 <input
@@ -383,30 +402,6 @@
                 </select>
               </label>
               <label class="full">
-                별점 (최대 5점)
-                <div class="rating-row">
-                  <div
-                    id="addStarRow"
-                    class="star-row"
-                    role="group"
-                    aria-label="별점 선택"
-                  ></div>
-                  <input
-                    type="number"
-                    name="rating"
-                    id="addRatingNum"
-                    class="rating-num-input"
-                    min="1"
-                    max="5"
-                    step="1"
-                    placeholder="1~5"
-                  />
-                </div>
-                <p class="field-hint">
-                  ⭐·☆을 누르거나 옆에 숫자를 입력하세요. 비우면 별점 없음.
-                </p>
-              </label>
-              <label class="full">
                 메모
                 <textarea
                   name="memo"
@@ -421,6 +416,68 @@
         </section>
       </div>
     </div>
+    <div
+      id="syncLoadingOverlay"
+      class="sync-loading-overlay"
+      hidden
+      aria-hidden="true"
+      aria-busy="false"
+    >
+      <div class="sync-loading-card" role="status" aria-live="polite">
+        <div class="sync-loading-logo" aria-hidden="true">
+          <svg
+            class="sync-mascot"
+            viewBox="0 0 120 120"
+            width="120"
+            height="120"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <ellipse cx="60" cy="98" rx="38" ry="8" fill="#a16207" opacity="0.18" />
+            <path
+              d="M28 58c0-18 14-32 32-32s32 14 32 32v18c0 8-6 14-14 14H42c-8 0-14-6-14-14V58z"
+              fill="#fde047"
+              stroke="#ca8a04"
+              stroke-width="3"
+            />
+            <path
+              d="M34 52c6-10 16-14 26-14s20 4 26 14"
+              fill="#fef9c3"
+              stroke="#eab308"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <circle cx="48" cy="62" r="3.5" fill="#422006" />
+            <circle cx="72" cy="62" r="3.5" fill="#422006" />
+            <path
+              d="M52 72q8 6 16 0"
+              fill="none"
+              stroke="#422006"
+              stroke-width="2.5"
+              stroke-linecap="round"
+            />
+            <ellipse cx="42" cy="68" rx="5" ry="3" fill="#fca5a5" opacity="0.55" />
+            <ellipse cx="78" cy="68" rx="5" ry="3" fill="#fca5a5" opacity="0.55" />
+            <rect x="18" y="28" width="6" height="44" rx="3" fill="#d97706" transform="rotate(-18 21 50)" />
+            <rect x="96" y="28" width="6" height="44" rx="3" fill="#d97706" transform="rotate(18 99 50)" />
+            <circle cx="88" cy="22" r="5" fill="#fef08a" stroke="#eab308" stroke-width="1.5" />
+            <path
+              d="M86 22l2 2 4-4"
+              fill="none"
+              stroke="#a16207"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <p class="sync-loading-brand">FindEat</p>
+        <p id="syncLoadingMsg" class="sync-loading-msg">주변 식당 받는 중…</p>
+        <div id="syncLoadingDots" class="sync-loading-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+
     <!-- 스크립트는 body 끝에 두어 DOM 파싱 후 실행됩니다. -->
     <script src="/app.js"></script>
   </body>

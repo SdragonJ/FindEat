@@ -27,6 +27,11 @@
 5. **주석 (초급자 설명)**  
    - 사용자가 따로 요청하지 않아도, **의미 있는 코드·스키마 수정**을 할 때마다 **함수/라우트 위 요약**과, 필요하면 **왜 이렇게 했는지**를 한국어로 짧게 남긴다.  
    - 세부 규칙은 `.cursor/rules/beginner-comments.mdc`를 따른다. (다른 프레임워크와의 비교 문구는 넣지 않는다.)
+6. **DB 스키마 파일 동기화**  
+   - `restaurants`(및 공통 DDL)를 바꿀 때 **`sql/schema_mariadb.sql`(MariaDB 기준본)** 과 **`sql/schema.sql`(SQL Server 참고)** 을 **항상 같은 컬럼·의미**로 맞춘다.  
+   - **신규 DB**는 `schema_mariadb.sql` 만 실행하면 끝(마이그레이션 불필요).  
+   - **기존 DB**는 에이전트가 만들면 사용자가 적용하는 **`migration_mariadb_*.sql`** 순서는 `schema_mariadb.sql` 파일 헤더·`.env.example` 과 동일하게 유지한다.  
+   - 마이그레이션을 새로 만들 때도 최종 테이블 모양이 `schema_mariadb.sql`·`schema.sql` 에 반영되도록 한다.
 
 ---
 
@@ -37,10 +42,10 @@
 | 스택        | Node.js + Express + **mysql2** (MariaDB)                 |
 | DB          | 외부 리눅스 MariaDB (`175.45.194.189:3307`)              |
 | 사용 DB     | **`terp_db`**                                            |
-| 핵심 테이블 | `restaurants` — `source`, `user_touched_at`, `rating`, `is_matjip`. 마이그레이션: `sql/migration_mariadb_restaurants_source.sql`, `sql/migration_mariadb_restaurants_user_touched_at.sql`, `sql/migration_mariadb_restaurants_rating.sql`, `sql/migration_mariadb_restaurants_is_matjip.sql` |
+| 핵심 테이블 | `restaurants` — `source`, `user_touched_at`, `rating`, `is_matjip`, `latitude`/`longitude`(DECIMAL), `distance_meters`. 마이그레이션: `sql/migration_mariadb_restaurants_*.sql`, 위·경도 타입: `migration_mariadb_restaurants_latlng_decimal.sql` |
 | 백엔드      | `server.js`                                              |
 | 프론트      | `public/`                                                |
-| 예전 SQL    | `sql/schema.sql`, `sql/seed.sql` — SQL Server용 (레거시) |
+| DDL        | **`sql/schema_mariadb.sql`** (MariaDB)·**`sql/schema.sql`** (SQL Server) — 구조 동시 유지. `sql/seed.sql` 은 SQL Server용 샘플 데이터 |
 
 ---
 

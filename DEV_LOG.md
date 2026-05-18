@@ -143,4 +143,100 @@
 - `index.html` / `app.js`: 추가·수정 체크박스, 점심 추천 거리 옆「맛집만」, 목록「맛집만 보기」; 목록·추천 결과에 맛집 뱃지
 - `lib/naverImport.js` 수입 시 `is_matjip=0`
 
+### 17. 네이버 수입 시 거리·도보(`source=naver`)
+- `mapx`·`mapy`를 WGS84(도×10⁷)로 해석, `.env` 의 `NAVER_REFERENCE_LAT`·`NAVER_REFERENCE_LNG` 가 있으면 Haversine으로 `distance_meters`·`walk_minutes`(분당 약 60m, UI 거리 필터와 동일 계열) 저장
+- 기준점 없으면 좌표만(`latitude`·`longitude`) 파싱 성공 시 저장, 거리·도보는 NULL
+- `server.js` 목록·추천·상세 SELECT 에 `latitude`·`longitude`·`distance_meters` 포함
+- `scripts/verify-naver.mjs` 첫 건 `mapx`/`mapy` 로그, `.env.example` 기준점 안내
+
+### 18. 위·경도 컬럼 DECIMAL 교정 + API에 기준점 노출
+- `sql/migration_mariadb_restaurants_latlng_decimal.sql`: INT 등으로 잘리던 `latitude`/`longitude` 를 `DECIMAL(10,7)` 로 수정
+- `server.js`: 응답에 `reference_location`(`.env` 내 위치), `lib/naverImport.js` 는 식당 좌표를 문자열 소수 7자리로 INSERT
+- `public/app.js`·`index.html`: 목록 카운트 옆 기준점 좌표, 목록에 직선 m, 추천·수정 화면에 기준점/식당 좌표 안내
+
+### 19. `schema.sql`(SQL Server) 을 MariaDB 스키마와 동기화
+- `sql/schema.sql`: `schema_mariadb.sql` 과 동일 컬럼군 및 UNIQUE `(source,external_id)` 등
+- `RULES_MEMO.md`: DDL 동시 반영 규칙·표 문구 정리
+
+### 23. 기준점 변경 후 거리·도보 재계산 CLI
+- `lib/naverImport.js`: `recalculateNaverDistancesFromEnv` — naver 행의 `distance_meters`·`walk_minutes`만 갱신
+- `npm run recalc:naver-distances` — `.env` LAT/LNG 수정 후 13997m·walk NULL 같은 옛 값 정리용
+
+### 22. verify·.env — 대륭19차(가산) 기준 안내
+- `verify-naver`: 기본 검색어를 `NAVER_IMPORT_QUERIES` 첫 항목으로, `강남역` 기본값 제거; 검색어 vs 기준점 좌표 구분 로그; 가산 대륭19차와 기준점 5km 이상이면 경고
+- `.env.example`: 대륭19차=가산(37.47x, 126.88x) 예시, 37.50/127.04(강남 쪽) 오설정 주의
+
+### 21. 네이버 도보 분(walk_minutes) 234분 등 오류 완화
+- 원인: 직선 약 14km(÷60≈234분) — 기준점 LAT/LNG 뒤바뀜·좌표 오류·재수입 시 중복 스킵으로 옛 값 유지
+- `lib/naverImport.js`: LAT/LNG 자동 교정·한국 범위 검사, 우회 1.25·75m/분, 3.5km 초과 시 walk NULL, `source=naver` 중복 시 UPDATE
+- `scripts/verify-naver.mjs`: 기준점·첫 건 직선 m·도보 분 미리보기
+- `server.js` sync 응답에 `updatedTotal`
+
+### 20. 스키마 기준본·마이그레이션 역할 정리
+- `sql/schema_mariadb.sql`: 신규 DB 시 이 파일만 실행하면 마이그레이션 전부 적용과 동일 구조; 헤더에 신규 vs 기존 절차·마이그레이션 순서 명시
+- 각 `migration_mariadb_*.sql`: 기존 DB용, 상단에「신규면 실행 불필요」안내; `source` 마이그레이션을 VARCHAR(100) 으로 기준본과 통일
+- `.env.example` 마이그레이션 순서를 헤더와 동일하게 수정
+- `sql/schema.sql`: 깨진 줄바꿈 정리
+
+---
+
+## 2026.05.18
+
+### 1. 식당 목록에서 메모 숨김
+- `public/app.js`: 목록 카드에서 메모 행 제거; 맛집 수정 화면(`openEdit`)·추천 결과(`showPick`)는 메모 유지
+- `public/style.css`: 목록 카드 고정 높이 2줄(제목·주소)에 맞게 4.5rem
+
+### 2. 목록 UI·헤더 정리
+- `public/app.js`: 도보 시간을 식당명 옆에 표시; 두 번째 줄은 주소·직선거리만; 목록 건수 옆 기준 좌표 문구 제거
+- `public/style.css`: FindEat 제목 3.5rem, `title-walk` 스타일
+
+### 3. 목록 도보 시간 색
+- `public/style.css`: `title-walk` 연한 빨강(`#e57373`); `app.js`에서 `muted` 클래스 제거
+
+### 4. 식당 목록 페이지 크기 50건
+- `public/app.js`: 목록 API `limit=50`
+- `server.js`: 기본·폴백 limit 50 (상한 50 유지)
+
+### 5. 주변 식당 최신화(네이버) 50건 목표
+- 원인: 네이버 지역 검색 API는 요청당·검색어당 최대 5건, `start` 페이지네이션 불가
+- `lib/naverImport.js`: 검색어+음식종류 변형으로 여러 번 호출, `NAVER_IMPORT_TARGET`(기본 50)까지 수입; 무의미한 페이지 루프 제거
+- `server.js`·`app.js`: 동기화 후 `naverTotal` 표시; `.env.example` 안내
+
+### 6. 최신화 로딩 오버레이
+- `index.html`: 전체 화면 오버레이 + FindEat 밥그릇 마스코트 SVG
+- `style.css`: 블러·스크롤 잠금·통통 튀는 애니메이션
+- `app.js`: `showSyncLoading` / `hideSyncLoading` — API 완료까지 클릭·스크롤 차단
+
+### 7. 최신화 완료 팝업 제거
+- `app.js`: 네이버 동기화 성공 시 `alert` 없음 — 로딩만 닫고 목록·카테고리 갱신 (실패 시에만 알림)
+
+### 8. 최신화 완료 로딩 전환
+- 성공 시 문구「최신화 완료」·점 애니메이션 숨김 → 1초 후 오버레이 닫힘 (`showSyncLoadingComplete`, `sleep`)
+
+### 9. 식당 목록 페이지당 5건
+- `public/app.js`·`server.js`: 목록 `limit` 기본 5 (6번째부터 다음 페이지·`#listPager`)
+
+### 10. 페이지 버튼 10개 묶음·화살표
+- `app.js`: `‹` `›` 로 1~10·11~20 … 묶음 이동, 현재 페이지는 묶음에 맞게 자동 정렬
+- `style.css`: `pager-btn` 크기 축소, `pager-btn--arrow` 스타일
+
+### 15. 도보 시간 필터 5·10·20·20분 이상
+- `index.html`·`app.js`·`server.js`: 2/5/10분(100·300·600m) → `max_walk_minutes` 5·10·20·`gte20`
+
+### 14. TMAP 도보 시간 보정(신호등 추산)
+- 10분 미만: TMAP 그대로(+3 없음); 10분 이상: 신호 가산 + `TMAP_WALK_BASE_EXTRA_MIN`(기본 +3분)
+
+### 13. 최신화 시 walk_minutes 보장
+- TMAP 우선(직선 3.5km 제한 전에 시도), import 후 `fillMissingWalkMinutesForNaver` 보정
+- `sync-naver`: `.env` 재로드, 기준점 없으면 400, 응답에 `tmapWalk`·`walkMinutesMissing`
+
+### 12. TMAP 보행 경로로 도보 분 계산
+- `lib/tmapWalk.js`: SK openapi 보행 API (`totalTime` 초 → 분, `totalDistance` m)
+- `lib/naverImport.js`: `TMAP_APP_KEY` 시 import·recalc 에 TMAP 사용, 실패 시 직선 추정
+- `npm run verify:tmap`, `.env.example` `TMAP_*` 안내; 목록 거리 문구 `약 Nm`
+
+### 11. 점심 추천 결과 — 목록형 박스
+- `buildListItemInnerHtml` 공통화; `showPick` → `list-browse-panel` + 카드(제목 옆 연빨강 도보, 위·경도 숨김)
+- 추천 결과에서 메모(link·map 등) 미표시
+
 ---

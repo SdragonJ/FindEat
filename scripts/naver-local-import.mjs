@@ -52,8 +52,8 @@ async function main() {
     for (const q of queries) {
       console.log(`… 검색어: ${q}`);
     }
-    const summary = await runNaverImportForQueries(pool, queries);
-    console.log(JSON.stringify({ ok: true, summary }, null, 2));
+    const out = await runNaverImportForQueries(pool, queries);
+    console.log(JSON.stringify({ ok: true, ...out }, null, 2));
   } finally {
     await pool.end();
   }

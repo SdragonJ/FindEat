@@ -8,7 +8,9 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "import:naver": "node scripts/naver-local-import.mjs",
-    "verify:naver": "node scripts/verify-naver.mjs"
+    "verify:naver": "node scripts/verify-naver.mjs",
+    "verify:tmap": "node scripts/verify-tmap.mjs",
+    "recalc:naver-distances": "node scripts/recalc-naver-distances.mjs"
   },
   "engines": {
     "node": ">=18"

@@ -1,19 +1,15 @@
 -- FindEat_CURSOR — SQL Server 스키마
 --
--- MariaDB / MySQL 은 `sql/schema_mariadb.sql` 을 사용하세요.
+-- MariaDB 원본·기준본은 `sql/schema_mariadb.sql` 입니다.
+-- 테이블 정의를 바꿀 때 두 파일을 같은 컬럼·의미로 맞춥니다.
+-- 마이그레이션만 추가할 때도 최종 모양이 `schema_mariadb.sql`·이 파일에 반영되도록 합니다.
 --
 -- [학습]
--- - SSMS/DBeaver에서 “스크립트 실행”으로 통째로 실행합니다. GO는 배치 구분자(SSMS/T-SQL).
--- - IF DB_ID(...) : 데이터베이스가 없을 때만 CREATE (이미 있으면 건너뜀).
--- - IDENTITY(1,1) : MySQL의 AUTO_INCREMENT 와 비슷, 삽입 시 id 자동 증가.
--- - NVARCHAR : 유니코드 문자열(한글 등). VARCHAR와 달리 길이가 “문자 단위”.
--- - dbo : 기본 스키마(테이블 네임스페이스).
-
--- DB 생성 권한이 없으면 IF 블록을 건너뛰고, 이미 만든 DB에 연결한 뒤 테이블 부분만 실행.
+-- - SSMS/DBeaver에서 통째로 실행. GO = 배치 구분자.
+-- - DECIMAL(10,7): 위·경도 소수 저장(INT 컬럼이면 37·127처럼 잘림).
 
 IF DB_ID(N'findeatDb') IS NULL
 BEGIN
-    -- 정렬은 서버 기본값 사용(일부 환경에서 Korean_Windows_CI_AS 미지원 시 오류 방지)
     CREATE DATABASE [findeatDb];
 END
 GO
@@ -23,16 +19,27 @@ GO
 
 IF OBJECT_ID(N'dbo.restaurants', N'U') IS NULL
 BEGIN
-    -- U = 사용자 테이블. 없을 때만 CREATE (재실행 시 중복 생성 방지)
     CREATE TABLE dbo.restaurants (
-        id            INT            NOT NULL IDENTITY(1, 1),  -- 기본키, 자동 증가
-        name          NVARCHAR(120)  NOT NULL,
-        category      NVARCHAR(40)   NOT NULL CONSTRAINT DF_restaurants_category DEFAULT (N'기타'),
-        address       NVARCHAR(255)  NULL,
-        walk_minutes  TINYINT        NULL,
-        memo          NVARCHAR(500)  NULL,
-        created_at    DATETIME2(0)   NOT NULL CONSTRAINT DF_restaurants_created_at DEFAULT (SYSDATETIME()),
-        CONSTRAINT PK_restaurants PRIMARY KEY CLUSTERED (id)
+        id               INT             NOT NULL IDENTITY(1, 1),
+        name             NVARCHAR(120)   NOT NULL,
+        category         NVARCHAR(40)    NOT NULL CONSTRAINT DF_restaurants_category DEFAULT (N'기타'),
+        address          NVARCHAR(255)   NULL,
+        walk_minutes     TINYINT         NULL,
+        memo             NVARCHAR(500)   NULL,
+        rating           TINYINT         NULL,
+        is_matjip        TINYINT         NOT NULL CONSTRAINT DF_restaurants_is_matjip DEFAULT (0),
+        created_at       DATETIME2(0)    NOT NULL CONSTRAINT DF_restaurants_created_at DEFAULT (SYSDATETIME()),
+        user_touched_at  DATETIME2(0)    NULL,
+        latitude         DECIMAL(10, 7)  NULL,
+        longitude        DECIMAL(10, 7)  NULL,
+        distance_meters  INT             NULL,
+        source           NVARCHAR(100)   NOT NULL CONSTRAINT DF_restaurants_source DEFAULT (N'user'),
+        external_id      NVARCHAR(100)   NULL,
+        phone            NVARCHAR(100)   NULL,
+        place_url        NVARCHAR(100)   NULL,
+        last_synced_at   DATETIME2(0)    NULL,
+        CONSTRAINT PK_restaurants PRIMARY KEY CLUSTERED (id),
+        CONSTRAINT UK_restaurants_source_external UNIQUE (source, external_id)
     );
 
     CREATE NONCLUSTERED INDEX idx_category ON dbo.restaurants (category);
