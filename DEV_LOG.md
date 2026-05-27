@@ -75,7 +75,7 @@
 11. GitHub Actions CI/CD
 - `main` push 시 CI(검사) 후 테스트 서버 self-hosted Runner로 pull·`pm2 restart` 자동화
 - 수정 전 : PC push 후 서버에서 수동 `git pull`·`pm2 restart findeat`
-- 수정 후 : `.github/workflows/ci-cd.yml`, `npm run check`, `docs/GITHUB_ACTIONS.md`(Runner 설치·배포 경로 `C:\dev\FindEat`, PowerShell `Exiting` 시 cmd `--unattended --runasservice`, CD shell `powershell`로 pwsh 미설치 대응)
+- 수정 후 : `.github/workflows/ci-cd.yml`, `npm run check`, `docs/GITHUB_ACTIONS.md`(Runner 설치·배포 경로 `C:\dev\FindEat`, PowerShell `Exiting` 시 cmd `--unattended --runasservice`, CD shell `powershell`로 pwsh 미설치 대응, Runner는 `C:\actions-runner` 권장·`Administrator` 폴더+NETWORK SERVICE 시 권한 오류)
 
 ----------------------------------------------------------------------------------------------------
 
