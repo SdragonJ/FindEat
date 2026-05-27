@@ -47,6 +47,7 @@
 | 백엔드      | `server.js`                                              |
 | 프론트      | `public/`                                                |
 | DDL        | **`sql/schema_mariadb.sql`** (MariaDB)·**`sql/schema.sql`** (SQL Server) — 구조 동시 유지. `sql/seed.sql` 은 SQL Server용 샘플 데이터 |
+| 배포 (테스트) | GitHub Actions `main` push → CI 후 Windows self-hosted Runner가 `C:\dev\FindEat` pull + `pm2 restart findeat`. 설치·수동 배포: `docs/GITHUB_ACTIONS.md` |
 
 ---
 

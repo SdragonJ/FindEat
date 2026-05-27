@@ -72,6 +72,11 @@
 - 수정 전 : 체크 시 색·스탬프 변화만
 - 수정 후 : `setupMatjipPopEffect`·`playMatjipPop`, `.toggle-stamp-burst` (`public/app.js`, `public/style.css`), `prefers-reduced-motion` 시 생략
 
+11. GitHub Actions CI/CD
+- `main` push 시 CI(검사) 후 테스트 서버 self-hosted Runner로 pull·`pm2 restart` 자동화
+- 수정 전 : PC push 후 서버에서 수동 `git pull`·`pm2 restart findeat`
+- 수정 후 : `.github/workflows/ci-cd.yml`, `npm run check`, `docs/GITHUB_ACTIONS.md`(Runner 설치·배포 경로 `C:\dev\FindEat`)
+
 ----------------------------------------------------------------------------------------------------
 
 ## 2026.05.18

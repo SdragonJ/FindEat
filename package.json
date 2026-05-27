@@ -5,6 +5,7 @@
   "description": "FindEat_CURSOR — 회사 주변 맛집 추천 (Express API + 정적 HTML/JS, MariaDB). JSON은 표준상 주석 불가: 스크립트는 npm start / npm dev, 엔트리는 server.js.",
   "main": "server.js",
   "scripts": {
+    "check": "node --check server.js && node --check lib/naverImport.js && node --check lib/tmapWalk.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "import:naver": "node scripts/naver-local-import.mjs",
