@@ -44,9 +44,10 @@ jobs:
     env:
       DEPLOY_PATH: C:\dev\FindEat
       PM2_APP_NAME: findeat
+    # Windows Server 기본은 Windows PowerShell. pwsh(PowerShell 7)는 없을 수 있음.
     defaults:
       run:
-        shell: pwsh
+        shell: powershell
     steps:
       - name: Deploy (pull + install + pm2 restart)
         run: |

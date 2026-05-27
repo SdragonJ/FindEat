@@ -17,8 +17,37 @@ PR은 **CI만** 돌고 서버는 건드리지 않습니다.
 1. RDP로 **네이버 클라우드 Windows VM** 접속
 2. 브라우저 → `https://github.com/SdragonJ/FindEat` → **Settings** → **Actions** → **Runners**
 3. **New self-hosted runner** → OS **Windows** → 안내 명령 복사
-4. **관리자 PowerShell**에서 실행 (예: `C:\actions-runner` 폴더에 설치)
-5. 설치 마지막에 **서비스로 등록** 권장 → VM 재부팅 후에도 Runner 유지
+4. Download·Extract까지 끝낸 뒤 **Configure** — 아래 **A(권장)** 또는 **B**
+5. GitHub **Runners**에 **Idle** 보이면 완료. **`run.cmd`는 서비스 등록 시 실행하지 않음**
+
+### A. Configure — 질문 없이 (권장, PowerShell에서 `Exiting...` 날 때)
+
+**관리자 cmd**(PowerShell 말고 `cmd.exe`)에서:
+
+```bat
+cd C:\Users\Administrator\actions-runner
+config.cmd --url https://github.com/SdragonJ/FindEat --token 여기_새_토큰 --name findeat-test --unattended --runasservice
+```
+
+PowerShell에서는 `config.cmd` 대신 **`.\config.cmd`** 로 실행합니다.
+
+- 토큰: GitHub Runners → **New self-hosted runner** → Configure 줄에만 잠깐 표시되는 값 (**만료 빠름**, 채팅·스크린샷에 올리지 말 것)
+- 이미 같은 이름 Runner가 있으면 `--replace` 추가
+- 성공 후 **`run.cmd` 실행 안 함**
+
+### B. Configure — 대화형 (cmd 권장)
+
+PowerShell 대신 **관리자 cmd**에서 `config.cmd --url ... --token ...` 실행 후, 질문마다 Enter / 서비스 **Y**.  
+중간에 Ctrl+C 하면 `Exiting...` · `Not configured` 가 납니다.
+
+### Runner 등록이 안 될 때
+
+| 증상 | 조치 |
+|------|------|
+| runner group 질문 직후 `Exiting...` | **cmd** + 위 **A** (`--unattended --runasservice`) |
+| `Not configured` + `run.cmd` | config **미완료** — `run.cmd` 말고 **A** 다시 |
+| 404 on registration | 토큰 **새로** 받아 1~2분 안에 config |
+| `config.cmd remove` — config files missing | 한 번도 성공 안 한 상태 → **A** 로 새로 등록 |
 
 ### 서버 사전 확인
 
@@ -78,8 +107,17 @@ GitHub → **Actions** 탭 → `CI/CD` 워크플로 실행 목록
 | `C:\dev\FindEat` 없음 | clone 경로·`DEPLOY_PATH` |
 | `git pull` 실패 | private repo 자격 증명 |
 | `pm2` 없음 | PATH, `pm2 restart findeat` 이름 |
+| CD `pwsh: command not found` | workflow는 `powershell`(5.x) 사용. pwsh 미설치 서버에서 발생 |
+
+### Runner 서비스가 Stopped일 때
+
+1. `run.cmd` 창이 열려 있으면 **Ctrl+C**로 종료 (서비스와 동시 실행 금지)
+2. `Get-Process Runner.Listener -ErrorAction SilentlyContinue | Stop-Process -Force`
+3. `Start-Service "actions.runner.SdragonJ-FindEat.findeat-test"`
+4. 안 되면 `services.msc` → 해당 서비스 → **시작**, 또는 `_diag` 최신 로그 확인
 
 ---
+
 
 ## 4. 환경 변수 (워크플로에서 변경 가능)
 
