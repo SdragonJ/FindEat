@@ -1,0 +1,10 @@
+{
+  // DEV_LOG.md만 저장 시 서식 예외 (다른 파일은 사용자/전역 설정 그대로)
+  "files.associations": {
+    "DEV_LOG.md": "plaintext"
+  },
+  "[plaintext]": {
+    "editor.formatOnSave": false,
+    "editor.defaultFormatter": null
+  }
+}

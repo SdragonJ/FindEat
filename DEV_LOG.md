@@ -2,241 +2,376 @@
 
 날짜별로 **무엇을 바꿨는지** 기록한다. 작업 규칙은 `RULES_MEMO.md`를 본다.
 
-**순서:** 의미 있는 변경을 마친 뒤 같은 세션에서 여기에 요약 추가(에이전트 자동). 큰 DB/배포는 시작 전 한 줄 의도 권장.
+**순서:** **최신 날짜가 맨 위**(오래된 날짜는 아래). 같은 날짜면 해당 섹션에 항목만 추가. 의미 있는 변경 후 같은 세션에서 갱신(에이전트 자동). 큰 DB/배포는 시작 전 한 줄 의도 권장.
 
-**작성 형식:** `번호. 제목` 바로 아래 디테일 (제목과 디테일 사이 빈 줄 없음)
+**작성 형식**
 
----
+- `번호. 제목` — 변경 주제 한 줄 (제목과 디테일 사이 빈 줄 없음)
+- 첫 불릿: 무엇을·왜 바꿨는지 한 줄 요약
+- `수정 전` / `수정 후` — 값·동작·파일 상태가 바뀐 경우 (신규 추가만이면 `추가` 한 줄로 대체 가능)
+- 날짜 구분 : 아래와 같은 긴 점선 한 줄 (`-` 100개). **이 파일만** 저장 서식 예외 — `.vscode/settings.json` + `.prettierignore`
 
-## 2026.05.12
+----------------------------------------------------------------------------------------------------
 
-### 1. 프로젝트 초기 구성
-- Express 백엔드 + `public/` 정적 프론트
-- `.env`로 DB·포트 설정
+## 2026.05.21
 
-### 2. SQL Server 연동
-- 드라이버: `mssql`
-- 로컬 SQLEXPRESS 기준 연결 설정
+1. DEV_LOG 제목 마크다운 제거
 
-### 3. restaurants 테이블·API
-- 컬럼: 이름, 카테고리, 주소, 도보 분, 메모, 등록일
-- API: 목록·추천·카테고리·CRUD·health
+- 항목 제목에서 `###` 제거
+- 수정 전 : `### 번호. 제목`
+- 수정 후 : `번호. 제목` (`##` 날짜만 유지), `dev-log.mdc` 동기화
 
-### 4. 거리 필터 (초기)
-- 100 / 200 / 300m → 도보 2 / 3 / 5분
-- DB `walk_minutes` 컬럼과 매칭
+2. DEV_LOG 항목 번호·순서 정리
 
-### 5. SQL 스크립트
-- `sql/schema.sql`, `sql/seed.sql` (SQL Server용)
+- 날짜 섹션 안 번호를 1부터 연속·작업 순으로
+- 수정 전 : 05.15 `19→23→22→21→20`, 05.18 `10→15→14→13→12→11`
+- 수정 후 : 05.15 `19→20→21→22→23`, 05.18 `10→11→12→13→14→15`
 
----
+3. DEV_LOG 작성 형식 통일
 
-## 2026.05.13
+- 모든 항목을「요약 + 수정 전/후」형식으로 재작성
+- 수정 전 : 파일·기능 나열 위주 불릿
+- 수정 후 : `번호. 제목` → 요약 한 줄 → `수정 전` / `수정 후`(또는 `추가`), `RULES_MEMO.md`·`dev-log.mdc` 규칙 반영
 
-### 1. DB 변환 (SQL Server → MariaDB)
-- `mssql` 제거, `mysql2` 설치
-- `server.js` 연결·쿼리 MariaDB 문법으로 변경 (`?` 바인딩, `dbo.` 제거 등)
-- 외부 DB `terp_db` 사용 (`findeat_db` 신규 생성은 서버 권한 문제로 보류)
+4. DEV_LOG 날짜 구분선
 
-### 2. restaurants 테이블 확장
-- MariaDB에 테이블 생성·컬럼 추가
-- 좌표, 거리, 출처, 외부 ID, 전화, URL, 동기화 시각
-- 중복 방지: `UNIQUE (source, external_id)` 가이드
+- 날짜 섹션 사이 구분선을 긴 점선으로 통일
+- 수정 전 : `---` (짧은 구분선)
+- 수정 후 : `----------------------------------------------------------------------------------------------------` (`-` 100개)
 
-### 3. 거리 필터 통일
-- 화면·서버 모두 100 / 300 / 600m → 2 / 5 / 10분
-- 수정 파일: `server.js`, `public/index.html`
+5. DEV_LOG 날짜 역순 정렬
 
-### 4. PROJECT_NOTES.md · DEV_LOG.md 추가
-- **PROJECT_NOTES.md**: 작업 규칙·강제 지시·프로젝트 고정 정보
-- **DEV_LOG.md**: 날짜별 개발 일지 (변경 전 먼저 기록)
-- `.env` 읽지 않기 등 규칙을 PROJECT_NOTES에 정리
+- 최신 날짜를 파일 맨 위로 배치
+- 수정 전 : 05.12 → 05.13 → 05.15 → 05.18 → 05.21 (오래된 날짜가 위)
+- 수정 후 : 05.21 → 05.18 → 05.15 → 05.13 → 05.12 (최신 날짜가 위), `RULES_MEMO.md`·`dev-log.mdc` 반영
 
-### 5. 주변 식당 자동 수집 (계획)
-- 외부 장소 API + import 흐름·스키마 방향 정리 (미구현)
+6. DEV_LOG 저장 시 구분선 짧아짐 방지
 
-### 6. DEV_LOG 작성 형식 정리
-- `번호. 제목` → 디테일 하위 항목 방식으로 통일
+- Markdown「저장 시 서식」이 `-` 100줄을 `---`로 줄임
+- 수정 전 : `DEV_LOG.md` = Markdown, 저장 시 `---`로 축소
+- 수정 후 : `.vscode/settings.json`에서 `DEV_LOG.md`를 `plaintext`로 연결, 긴 점선 유지
 
-### 7. 규칙 메모 파일 이름 변경
-- `PROJECT_NOTES.md` → `RULES_MEMO.md` (규칙을 적어 두는 메모)
-- 파일 내 참조·DEV_LOG 안내 문구 함께 수정
+7. DEV_LOG만 저장 서식 예외 (워크스페이스)
+- `DEV_LOG.md`만 plaintext + formatOnSave 끔, Prettier ignore
+- 수정 전 : plaintext 연결만 있어 전역 Markdown 서식이 여전히 적용될 수 있음
+- 수정 후 : `[plaintext]` `formatOnSave: false`, `.prettierignore`에 `DEV_LOG.md`만 등록
 
-### 8. DEV_LOG 줄바꿈 규칙
-- 제목(`###`) 바로 다음 줄에 디테일 — 제목과 디테일 사이 빈 줄 없음
+8. 네이버 클라우드 테스트 서버 FindEat 배포·외부 URL 접속
+- RDP Windows VM에 GitHub `clone` → `.env`(로컬과 동일, DB는 외부 리눅스) → `npm install`·`npm start`(PORT=3001), Jenkins 없이 `git pull` 배포
+- 서버 안 `http://127.0.0.1:3001/` 확인 후 PC·운영 Nexacro `system.execBrowser("http://공인IP:3001/")` — RDP는 3389, FindEat은 3001(별도 포트)
+- 수정 전 : PC→공인IP:3001 타임아웃(3389 RDP만 허용), Windows 방화벽만으로는 부족
+- 수정 후 : Windows 인바운드 3001 + 네이버 클라우드 ACG(보안 그룹) 인바운드 TCP 3001, PC·운영 PC에서 테스트 서버 FindEat URL 접속 가능
 
----
-
-## 2026.05.15
-
-### 1. 카테고리 콤보에서 기타 맨 아래
-- `public/app.js`: `orderCategoriesWithMiscLast`, 추천·필터·추가·수정 셀렉트 동일 적용
-- 등록 후 기본값 `기타` 유지
-
-### 2. 주석·학습용 문서
-- `public/app.js`, `server.js`, `public/index.html`, `public/style.css`, `sql/schema.sql`, `sql/seed.sql`에 함수/구간 설명 및 문법 힌트 주석 추가
-
-### 3. DEV_LOG 자동 기록 규칙
-- `.cursor/rules/dev-log.mdc` 추가 (`alwaysApply`) — 작업 후 날짜별로 `DEV_LOG.md` 갱신
-- `RULES_MEMO.md`의 DEV_LOG 규칙 문구를 “완료 후 자동 기록 + 날짜 섹션 없으면 생성”에 맞게 정리
-
-### 4. 주석에서 Next.js 대비 문구 제거
-- 이 저장소는 Express + 정적 HTML/JS이므로, `app.js`·`server.js`·`index.html`·`style.css`·`sql/*`·`DEV_LOG`에서 Next/React/Prisma 비교 설명 삭제, 스택에 맞는 설명만 유지
-
-### 5. 수정할 때마다 초급자용 주석 자동
-- `.cursor/rules/beginner-comments.mdc` 추가 (`alwaysApply`) — 별도 요청 없이 의미 있는 변경 시 함수/라우트 위·필요 시 인라인 주석 보강
-- `RULES_MEMO.md` 필수 규칙 5번·표·사용자 메모에 반영
-
-### 6. 네이버 지역 검색 → DB 배치(초안)
-- `scripts/naver-local-import.mjs`: `openapi.naver.com/v1/search/local.json` 호출 후 `restaurants` INSERT (이름+주소 중복 스킵)
-- `package.json` 스크립트 `import:naver`, `.env.example`에 NAVER_*·MariaDB 안내 추가
-- NCP Dynamic Map 전용 키와 검색 API 권한 차이·월간 스케줄은 스크립트 상단 주석에 정리
-
-### 7. 네이버 키 발급 후 연결 절차
-- `scripts/verify-naver.mjs`, `npm run verify:naver`, `.env.example` 단계 안내
-
-### 8. 출처(source) + 화면에서 네이버 최신화
-- `sql/migration_mariadb_restaurants_source.sql`: `source` 컬럼 `user` | `naver`
-- `lib/naverImport.js`: CLI·서버 공통 수입 로직
-- `POST /api/restaurants/sync-naver`: `naver` 행만 DELETE 후 재수입, `user` 유지
-- `index.html` / `app.js` / `style.css`: 주변 식당 최신화 버튼, 목록 뱃지
-
-### 9. 맛집 추가 폼 (필수·순서)
-- 필수: 이름·도보만 — `input-required`(빨간 테두리)도 이 둘만, `*` 없음
-- 순서: 이름 → 도보 → 주소(위치) → 카테고리 → 메모(이름·도보·주소는 각각 `full` 한 줄)
-- `POST /api/restaurants`: 이름·도보 필수 검증, 주소 비면 NULL
-
-### 10. 라벨·음식 종류 고정 콤보
-- `public/index.html`: 라벨 `식당이름`·`음식 종류`(추천·필터·추가·수정)
-- `public/app.js`: `FOOD_CATEGORIES` 고정 9종, `/api/restaurants/categories` 없이 `fillCategorySelects`만 사용
-- `lib/naverImport.js`: 네이버 `category` 첫 세그먼트가 목록에 없으면 DB에 `기타` 저장
-
-### 11. 맛집 수정 화면에서 삭제
-- `DELETE /api/restaurants/:id`: 해당 `id` 행 삭제, 없으면 404
-- `index.html` / `style.css`: 저장 버튼 아래 `삭제` 버튼(위험 스타일), `app.js`에서 확인 후 호출
-
-### 12. 목록에서 직접 데이터 우선
-- `GET /api/restaurants`: `user_touched_at IS NOT NULL` 행을 먼저(최근 손댄 순), `NULL` 은 아래(카테고리·이름)
-- `POST`: `user_touched_at = NOW()`; `PUT`: `source` 유지, `user_touched_at = NOW()` 만 갱신 → `source=naver` 도 저장하면 상단
-- 마이그레이션: `sql/migration_mariadb_restaurants_user_touched_at.sql` (기존 `source=user` 행은 `created_at` 으로 백필)
-- (이전 `source=user` 우선만 쓰던 방식은 제거 — naver 수정 행도 상단에 오도록 위 컬럼으로 통일)
-
-### 13. 별점 (1~5점)
-- `sql/migration_mariadb_restaurants_rating.sql`: `rating` TINYINT NULL (1~5)
-- `server.js`: 목록·상세·추천 SELECT, POST/PUT 검증·저장, `lib/naverImport.js` 수입 시 `rating` NULL
-- `index.html` / `style.css` / `app.js`: ⭐·☆ 클릭 + 옆 숫자 입력, 목록·추천에 표시
-
-### 14. 점심 추천 별점 조건
-- 메인「오늘 점심 추천」: 음식 종류 아래 `별점` 셀렉트(1점 이상~5점)
-- `GET /api/restaurants/pick?min_rating=`: `rating >= min_rating` (NULL 별점 행은 조건 걸면 제외)
-
-### 15. 맛집 목록 페이지네이션·고정 카드 높이
-- `GET /api/restaurants`: `page`·`limit`(기본 5, 최대 50), `min_rating`, 응답 `{ items, total, page, pageSize, totalPages }`
-- `index.html` `#listPager`, `app.js` 페이지 버튼·필터 시 페이지 1 리셋·등록 후 1페이지
-- `style.css`: 목록 카드 고정 높이 + 제목·주소·메모 한 줄 말줄임(`…`); 별점은 **음식 종류 오른쪽**(제목과 분리)
-- 점심 추천: 헤더에 **추천 받기** 오른쪽 정렬, 필터 순서 **거리 → 음식 종류 → 별점**; 목록 필터도 **거리 → 음식 종류 → 별점**·`pick-stack` + `field-full` 로 위와 동일 레이아웃
-- `.toolbar select` 가 세로 스택에서 높이로 먹던 문제 수정(`:not(.toolbar-stack)`), 목록은 `toolbar` 제거
-
-### 16. 맛집 표시(`is_matjip`)
-- `sql/migration_mariadb_restaurants_is_matjip.sql`: `is_matjip` TINYINT(1) 기본 0
-- `GET /api/restaurants`·`/pick`: `matjip_only=1` 이면 `is_matjip=1` 만; POST/PUT 본문 `is_matjip`
-- `index.html` / `app.js`: 추가·수정 체크박스, 점심 추천 거리 옆「맛집만」, 목록「맛집만 보기」; 목록·추천 결과에 맛집 뱃지
-- `lib/naverImport.js` 수입 시 `is_matjip=0`
-
-### 17. 네이버 수입 시 거리·도보(`source=naver`)
-- `mapx`·`mapy`를 WGS84(도×10⁷)로 해석, `.env` 의 `NAVER_REFERENCE_LAT`·`NAVER_REFERENCE_LNG` 가 있으면 Haversine으로 `distance_meters`·`walk_minutes`(분당 약 60m, UI 거리 필터와 동일 계열) 저장
-- 기준점 없으면 좌표만(`latitude`·`longitude`) 파싱 성공 시 저장, 거리·도보는 NULL
-- `server.js` 목록·추천·상세 SELECT 에 `latitude`·`longitude`·`distance_meters` 포함
-- `scripts/verify-naver.mjs` 첫 건 `mapx`/`mapy` 로그, `.env.example` 기준점 안내
-
-### 18. 위·경도 컬럼 DECIMAL 교정 + API에 기준점 노출
-- `sql/migration_mariadb_restaurants_latlng_decimal.sql`: INT 등으로 잘리던 `latitude`/`longitude` 를 `DECIMAL(10,7)` 로 수정
-- `server.js`: 응답에 `reference_location`(`.env` 내 위치), `lib/naverImport.js` 는 식당 좌표를 문자열 소수 7자리로 INSERT
-- `public/app.js`·`index.html`: 목록 카운트 옆 기준점 좌표, 목록에 직선 m, 추천·수정 화면에 기준점/식당 좌표 안내
-
-### 19. `schema.sql`(SQL Server) 을 MariaDB 스키마와 동기화
-- `sql/schema.sql`: `schema_mariadb.sql` 과 동일 컬럼군 및 UNIQUE `(source,external_id)` 등
-- `RULES_MEMO.md`: DDL 동시 반영 규칙·표 문구 정리
-
-### 23. 기준점 변경 후 거리·도보 재계산 CLI
-- `lib/naverImport.js`: `recalculateNaverDistancesFromEnv` — naver 행의 `distance_meters`·`walk_minutes`만 갱신
-- `npm run recalc:naver-distances` — `.env` LAT/LNG 수정 후 13997m·walk NULL 같은 옛 값 정리용
-
-### 22. verify·.env — 대륭19차(가산) 기준 안내
-- `verify-naver`: 기본 검색어를 `NAVER_IMPORT_QUERIES` 첫 항목으로, `강남역` 기본값 제거; 검색어 vs 기준점 좌표 구분 로그; 가산 대륭19차와 기준점 5km 이상이면 경고
-- `.env.example`: 대륭19차=가산(37.47x, 126.88x) 예시, 37.50/127.04(강남 쪽) 오설정 주의
-
-### 21. 네이버 도보 분(walk_minutes) 234분 등 오류 완화
-- 원인: 직선 약 14km(÷60≈234분) — 기준점 LAT/LNG 뒤바뀜·좌표 오류·재수입 시 중복 스킵으로 옛 값 유지
-- `lib/naverImport.js`: LAT/LNG 자동 교정·한국 범위 검사, 우회 1.25·75m/분, 3.5km 초과 시 walk NULL, `source=naver` 중복 시 UPDATE
-- `scripts/verify-naver.mjs`: 기준점·첫 건 직선 m·도보 분 미리보기
-- `server.js` sync 응답에 `updatedTotal`
-
-### 20. 스키마 기준본·마이그레이션 역할 정리
-- `sql/schema_mariadb.sql`: 신규 DB 시 이 파일만 실행하면 마이그레이션 전부 적용과 동일 구조; 헤더에 신규 vs 기존 절차·마이그레이션 순서 명시
-- 각 `migration_mariadb_*.sql`: 기존 DB용, 상단에「신규면 실행 불필요」안내; `source` 마이그레이션을 VARCHAR(100) 으로 기준본과 통일
-- `.env.example` 마이그레이션 순서를 헤더와 동일하게 수정
-- `sql/schema.sql`: 깨진 줄바꿈 정리
-
----
+----------------------------------------------------------------------------------------------------
 
 ## 2026.05.18
 
-### 1. 식당 목록에서 메모 숨김
-- `public/app.js`: 목록 카드에서 메모 행 제거; 맛집 수정 화면(`openEdit`)·추천 결과(`showPick`)는 메모 유지
-- `public/style.css`: 목록 카드 고정 높이 2줄(제목·주소)에 맞게 4.5rem
+1. 식당 목록 메모 숨김
 
-### 2. 목록 UI·헤더 정리
-- `public/app.js`: 도보 시간을 식당명 옆에 표시; 두 번째 줄은 주소·직선거리만; 목록 건수 옆 기준 좌표 문구 제거
-- `public/style.css`: FindEat 제목 3.5rem, `title-walk` 스타일
+- 목록 카드만 메모 비표시
+- 수정 전 : 목록 카드에 메모 행 표시
+- 수정 후 : 목록에서 메모 제거, 수정·추천 화면은 유지, 카드 높이 4.5rem(2줄)
 
-### 3. 목록 도보 시간 색
-- `public/style.css`: `title-walk` 연한 빨강(`#e57373`); `app.js`에서 `muted` 클래스 제거
+2. 목록 UI·헤더 정리
 
-### 4. 식당 목록 페이지 크기 50건
-- `public/app.js`: 목록 API `limit=50`
-- `server.js`: 기본·폴백 limit 50 (상한 50 유지)
+- 도보 시간·주소·제목 크기 조정
+- 수정 전 : 도보 별도 줄, 목록 건수 옆 기준 좌표 문구
+- 수정 후 : 도보를 식당명 옆(`title-walk`), 2줄째 주소·직선거리만, FindEat 제목 3.5rem
 
-### 5. 주변 식당 최신화(네이버) 50건 목표
-- 원인: 네이버 지역 검색 API는 요청당·검색어당 최대 5건, `start` 페이지네이션 불가
-- `lib/naverImport.js`: 검색어+음식종류 변형으로 여러 번 호출, `NAVER_IMPORT_TARGET`(기본 50)까지 수입; 무의미한 페이지 루프 제거
-- `server.js`·`app.js`: 동기화 후 `naverTotal` 표시; `.env.example` 안내
+3. 목록 도보 시간 색
 
-### 6. 최신화 로딩 오버레이
-- `index.html`: 전체 화면 오버레이 + FindEat 밥그릇 마스코트 SVG
-- `style.css`: 블러·스크롤 잠금·통통 튀는 애니메이션
-- `app.js`: `showSyncLoading` / `hideSyncLoading` — API 완료까지 클릭·스크롤 차단
+- 도보 분 강조 색
+- 수정 전 : `title-walk` + `muted`(회색 톤)
+- 수정 후 : `title-walk` 연한 빨강 `#e57373`, `muted` 제거
 
-### 7. 최신화 완료 팝업 제거
-- `app.js`: 네이버 동기화 성공 시 `alert` 없음 — 로딩만 닫고 목록·카테고리 갱신 (실패 시에만 알림)
+4. 식당 목록 페이지 크기 50건
 
-### 8. 최신화 완료 로딩 전환
-- 성공 시 문구「최신화 완료」·점 애니메이션 숨김 → 1초 후 오버레이 닫힘 (`showSyncLoadingComplete`, `sleep`)
+- 한 페이지 최대 건수 확대(이후 9번에서 다시 5건)
+- 수정 전 : `limit` 기본 5
+- 수정 후 : `limit` 기본·상한 50 (`app.js`, `server.js`)
 
-### 9. 식당 목록 페이지당 5건
-- `public/app.js`·`server.js`: 목록 `limit` 기본 5 (6번째부터 다음 페이지·`#listPager`)
+5. 네이버 최신화 50건 목표
 
-### 10. 페이지 버튼 10개 묶음·화살표
-- `app.js`: `‹` `›` 로 1~10·11~20 … 묶음 이동, 현재 페이지는 묶음에 맞게 자동 정렬
-- `style.css`: `pager-btn` 크기 축소, `pager-btn--arrow` 스타일
+- API 5건 제한을 검색어 변형으로 우회
+- 수정 전 : 검색 1회 5건, 페이지 루프 무의미
+- 수정 후 : 검색어+음식종류 변형 반복, `NAVER_IMPORT_TARGET` 기본 50, `naverTotal` 표시
 
-### 15. 도보 시간 필터 5·10·20·20분 이상
-- `index.html`·`app.js`·`server.js`: 2/5/10분(100·300·600m) → `max_walk_minutes` 5·10·20·`gte20`
+6. 최신화 로딩 오버레이
 
-### 14. TMAP 도보 시간 보정(신호등 추산)
-- 10분 미만: TMAP 그대로(+3 없음); 10분 이상: 신호 가산 + `TMAP_WALK_BASE_EXTRA_MIN`(기본 +3분)
+- 동기화 중 전체 화면 차단 UI
+- 수정 전 : 버튼만 비활성·로딩 표시 없음
+- 수정 후 : 오버레이+마스코트 SVG, 블러·스크롤 잠금, `showSyncLoading`/`hideSyncLoading`
 
-### 13. 최신화 시 walk_minutes 보장
-- TMAP 우선(직선 3.5km 제한 전에 시도), import 후 `fillMissingWalkMinutesForNaver` 보정
-- `sync-naver`: `.env` 재로드, 기준점 없으면 400, 응답에 `tmapWalk`·`walkMinutesMissing`
+7. 최신화 완료 팝업 제거
 
-### 12. TMAP 보행 경로로 도보 분 계산
-- `lib/tmapWalk.js`: SK openapi 보행 API (`totalTime` 초 → 분, `totalDistance` m)
-- `lib/naverImport.js`: `TMAP_APP_KEY` 시 import·recalc 에 TMAP 사용, 실패 시 직선 추정
-- `npm run verify:tmap`, `.env.example` `TMAP_*` 안내; 목록 거리 문구 `약 Nm`
+- 성공 시 alert 제거
+- 수정 전 : 동기화 성공 `alert`
+- 수정 후 : 로딩만 닫고 목록 갱신(실패만 알림)
 
-### 11. 점심 추천 결과 — 목록형 박스
-- `buildListItemInnerHtml` 공통화; `showPick` → `list-browse-panel` + 카드(제목 옆 연빨강 도보, 위·경도 숨김)
-- 추천 결과에서 메모(link·map 등) 미표시
+8. 최신화 완료 로딩 전환
 
----
+- 완료 문구 후 1초 뒤 닫힘
+- 수정 전 : API 끝나면 즉시 오버레이 닫힘
+- 수정 후 : 「최신화 완료」→1초 후 닫힘 (`showSyncLoadingComplete`)
+
+9. 식당 목록 페이지당 5건
+
+- 4번 50건 설정을 다시 5건으로
+- 수정 전 : `limit` 50
+- 수정 후 : `limit` 기본 5, `#listPager`로 6번째부터 다음 페이지
+
+10. 페이지 버튼 10개 묶음·화살표
+
+- 페이지 번호 UI 개선
+- 수정 전 : 모든 페이지 번호 나열
+- 수정 후 : `‹` `›`로 1~10·11~20 묶음, `pager-btn` 축소
+
+11. TMAP 보행 경로 도보 분
+
+- 직선 추정 대신 TMAP 보행 API 우선
+- 수정 전 : Haversine·분당 60m 추정만
+- 수정 후 : `lib/tmapWalk.js`, `TMAP_APP_KEY` 시 import·recalc TMAP, `npm run verify:tmap`, 목록 `약 Nm`
+
+12. 최신화 시 walk_minutes 보장
+
+- TMAP 실패·누락 보정
+- 수정 전 : import 후 walk NULL 가능, 3.5km 제한이 TMAP보다 먼저
+- 수정 후 : TMAP 우선 시도, `fillMissingWalkMinutesForNaver`, `sync-naver` `.env` 재로드·기준점 400·`tmapWalk` 응답
+
+13. TMAP 도보 시간 보정
+
+- 신호등·기본 가산 분 반영
+- 수정 전 : TMAP 분 그대로(또는 직선만)
+- 수정 후 : 10분 미만 TMAP 그대로, 10분 이상 신호 가산 + `TMAP_WALK_BASE_EXTRA_MIN`(기본 +3)
+
+14. 점심 추천 결과 목록형
+
+- 추천 결과를 목록 카드와 동일 레이아웃
+- 수정 전 : 추천 전용 단순 블록, 메모·좌표 노출
+- 수정 후 : `buildListItemInnerHtml` 공통, `list-browse-panel`, 제목 옆 도보·좌표 숨김·메모 미표시
+
+15. 도보 시간 필터 변경
+
+- 거리(m) 필터를 도보(분) 필터로
+- 수정 전 : 2/5/10분(100·300·600m)
+- 수정 후 : `max_walk_minutes` 5·10·20·`gte20`(20분 이상)
+
+----------------------------------------------------------------------------------------------------
+
+## 2026.05.15
+
+1. 카테고리 콤보 정렬
+
+- `기타`를 콤보 맨 아래로 고정
+- 수정 전 : API·DB 순서 그대로
+- 수정 후 : `orderCategoriesWithMiscLast` — 추천·필터·추가·수정 공통, 등록 후 기본값 `기타`
+
+2. 주석·학습용 문서
+
+- 초급자용 설명 주석 대량 추가
+- 수정 전 : 최소 주석
+- 수정 후 : `app.js`, `server.js`, `index.html`, `style.css`, `sql/schema.sql`, `sql/seed.sql` 함수·구간·문법 힌트
+
+3. DEV_LOG 자동 기록 규칙
+
+- Cursor가 작업 후 일지를 자동 갱신
+- 추가 : `.cursor/rules/dev-log.mdc` (`alwaysApply`), `RULES_MEMO.md` “완료 후 자동 기록” 문구
+
+4. 주석 스택 정리
+
+- Next/React 비교 문구 제거
+- 수정 전 : Next·React·Prisma 대비 설명 포함
+- 수정 후 : Express + 정적 HTML/JS 기준 설명만 (`app.js`, `server.js`, `index.html`, `style.css`, `sql/*`, `DEV_LOG`)
+
+5. 초급자용 주석 자동 규칙
+
+- 의미 있는 수정 시 주석 자동 보강
+- 추가 : `.cursor/rules/beginner-comments.mdc`, `RULES_MEMO.md` 필수 규칙 5번·표 반영
+
+6. 네이버 지역 검색 → DB 배치(초안)
+
+- 네이버 로컬 검색 결과를 DB에 넣는 CLI 초안
+- 추가 : `scripts/naver-local-import.mjs`, `npm run import:naver`, `.env.example` NAVER\_\*·MariaDB 안내
+
+7. 네이버 키 연결 절차
+
+- 키 발급 후 동작 확인 스크립트
+- 추가 : `scripts/verify-naver.mjs`, `npm run verify:naver`, `.env.example` 단계 안내
+
+8. 출처(source) + 네이버 최신화
+
+- `user`/`naver` 출처 구분·화면 동기화
+- 수정 전 : 출처 없음, 수동·CLI 수입만
+- 수정 후 : `source` 컬럼, `lib/naverImport.js`, `POST /sync-naver`(naver만 DELETE 후 재수입), 최신화 버튼·뱃지
+
+9. 맛집 추가 폼 (필수·순서)
+
+- 필수·필드 순서·API 검증 정리
+- 수정 전 : 필드 필수·순서 불명확
+- 수정 후 : 필수 이름·도보만(`input-required`), 순서 이름→도보→주소→카테고리→메모, `POST` 주소 NULL 허용
+
+10. 라벨·음식 종류 고정 콤보
+
+- 카테고리 API 대신 고정 9종
+- 수정 전 : `/api/restaurants/categories` 동적 목록
+- 수정 후 : `FOOD_CATEGORIES` 9종, 라벨 `식당이름`·`음식 종류`, 네이버 미매칭 시 `기타`
+
+11. 맛집 수정 화면 삭제
+
+- 수정 화면에서 행 삭제 가능
+- 추가 : `DELETE /api/restaurants/:id`, 확인 후 삭제 버튼(`index.html`, `style.css`, `app.js`)
+
+12. 목록 정렬 (직접 손댄 데이터 우선)
+
+- 사용자가 저장·수정한 행을 목록 상단
+- 수정 전 : `source=user` 우선만
+- 수정 후 : `user_touched_at` 최근 순 상단, `PUT` 시 `source` 유지·`user_touched_at` 갱신, 마이그레이션 `migration_mariadb_restaurants_user_touched_at.sql`
+
+13. 별점 (1~5점)
+
+- 식당별 1~5점 저장·표시
+- 수정 전 : 별점 없음
+- 수정 후 : `rating` TINYINT, 목록·추천·추가·수정 UI, 네이버 수입 시 NULL
+
+14. 점심 추천 별점 조건
+
+- 추천 시 최소 별점 필터
+- 수정 전 : `/pick` 별점 조건 없음
+- 수정 후 : UI 별점 셀렉트, `GET /pick?min_rating=` (`NULL` 별점은 조건 시 제외)
+
+15. 맛집 목록 페이지네이션·카드 레이아웃
+
+- 목록 페이징·카드 높이·필터 순서 통일
+- 수정 전 : 전체 목록 한 번에, 필터·레이아웃 제각각
+- 수정 후 : `page`·`limit`(기본 5), `#listPager`, 카드 고정 높이·말줄임, 필터 순서 거리→음식→별점, `.toolbar` 목록에서 제거
+
+16. 맛집 표시(`is_matjip`)
+
+- 맛집 플래그·필터·뱃지
+- 수정 전 : 맛집 구분 없음
+- 수정 후 : `is_matjip` 컬럼, `matjip_only` 쿼리·체크박스·「맛집만」필터, 수입 시 0
+
+17. 네이버 수입 시 거리·도보
+
+- 기준점 기준 직선 거리·도보 분 저장
+- 수정 전 : 좌표·거리 미저장
+- 수정 후 : `mapx`/`mapy`→WGS84, `NAVER_REFERENCE_*` 있으면 Haversine `distance_meters`·`walk_minutes`, 없으면 좌표만
+
+18. 위·경도 DECIMAL + 기준점 API 노출
+
+- 좌표 정밀도·화면 안내
+- 수정 전 : `latitude`/`longitude` INT 등으로 잘림, 기준점 미노출
+- 수정 후 : `DECIMAL(10,7)`, 응답 `reference_location`, 목록·추천·수정에 좌표 안내
+
+19. schema.sql MariaDB 동기화
+
+- SQL Server DDL 파일을 MariaDB 기준본과 맞춤
+- 수정 전 : `schema.sql` 구버전 컬럼
+- 수정 후 : `schema_mariadb.sql`과 동일 컬럼·`UNIQUE (source,external_id)`, `RULES_MEMO.md` DDL 동시 반영 규칙
+
+20. 스키마 기준본·마이그레이션 역할 정리
+
+- 신규 DB vs 기존 DB 절차 문서화
+- 수정 전 : schema·migration 역할 혼재
+- 수정 후 : `schema_mariadb.sql`=신규 일괄, `migration_*.sql`=기존 DB만, `.env.example` 순서·`schema.sql` 줄바꿈 정리
+
+21. 네이버 도보 분 오류 완화
+
+- 234분 등 비정상 walk_minutes 방지
+- 수정 전 : LAT/LNG 오류·중복 스킵으로 옛 walk 유지, 직선÷60만 사용
+- 수정 후 : LAT/LNG 교정·한국 범위 검사, 우회 1.25·75m/분, 3.5km 초과 walk NULL, naver 중복 UPDATE, `verify-naver` 미리보기
+
+22. verify·.env 기준점 안내
+
+- 가산(대륭19차) 기준 예시·오설정 경고
+- 수정 전 : 기본 검색어 `강남역`, 기준점 혼동 가능
+- 수정 후 : `NAVER_IMPORT_QUERIES` 첫 항목, 검색어 vs 기준점 로그, 5km 이상 경고, `.env.example` 가산 좌표 예시
+
+23. 기준점 변경 후 거리·도보 재계산 CLI
+
+- `.env` LAT/LNG만 바꾼 뒤 naver 행 거리 재계산
+- 수정 전 : 수동 재수입 또는 옛 `distance_meters`·walk 유지
+- 수정 후 : `npm run recalc:naver-distances`, `recalculateNaverDistancesFromEnv`
+
+----------------------------------------------------------------------------------------------------
+
+## 2026.05.13
+
+1. DB 연동 변경
+
+- SQL Server에서 MariaDB(`mysql2`)로 전환
+- 수정 전 : `mssql`, `dbo.` 스키마, `@param` 바인딩
+- 수정 후 : `mysql2`, `?` 바인딩, 외부 DB `terp_db` (`findeat_db` 신규 생성은 권한 문제로 보류)
+
+2. restaurants 스키마 확장
+
+- 수입·동기화용 컬럼 추가
+- 수정 전 : 기본 식당 필드만
+- 수정 후 : 좌표, 거리, `source`, `external_id`, 전화, URL, 동기화 시각, `UNIQUE (source, external_id)` 가이드
+
+3. 거리 필터 통일
+
+- 화면·서버 거리·도보 매핑을 하나로 맞춤
+- 수정 전 : 100/200/300m → 2/3/5분
+- 수정 후 : 100/300/600m → 2/5/10분 (`server.js`, `public/index.html`)
+
+4. 규칙·일지 문서 추가
+
+- 작업 규칙과 개발 일지 파일 분리
+- 추가 : `PROJECT_NOTES.md`(규칙·고정 정보), `DEV_LOG.md`(날짜별 일지), `.env` 미읽기 규칙
+
+5. 주변 식당 자동 수집 (계획)
+
+- 외부 API import 방향만 문서화
+- 수정 전 : 미구현
+- 수정 후 : 외부 장소 API + import 흐름·스키마 방향 정리(코드 없음)
+
+6. DEV_LOG 작성 형식 정리
+
+- 일지 항목 구조 통일
+- 수정 전 : 자유 서술
+- 수정 후 : `번호. 제목` → 바로 아래 디테일 불릿
+
+7. 규칙 메모 파일 이름 변경
+
+- 규칙 전용 파일명 변경
+- 수정 전 : `PROJECT_NOTES.md`
+- 수정 후 : `RULES_MEMO.md` (내부·DEV_LOG 참조 문구 동기화)
+
+8. DEV_LOG 줄바꿈 규칙
+
+- 제목과 본문 사이 빈 줄 금지
+- 수정 전 : 제목·디테일 사이 빈 줄 허용
+- 수정 후 : 제목 다음 줄부터 바로 디테일
+
+----------------------------------------------------------------------------------------------------
+
+## 2026.05.12
+
+1. 프로젝트 초기 구성
+
+- FindEat 저장소 골격 신규 생성
+- 추가 : Express 백엔드 + `public/` 정적 프론트 + `.env` DB·포트 설정
+
+2. SQL Server 연동
+
+- 로컬 DB를 SQL Server Express로 연결
+- 추가 : 드라이버 `mssql`, `SQLEXPRESS` 연결 문자열
+
+3. restaurants 테이블·API
+
+- 식당 CRUD·목록·추천 API 최초 구현
+- 추가 : 컬럼(이름, 카테고리, 주소, 도보 분, 메모, 등록일), `/api/restaurants`·`/pick`·`/categories`·`health`
+
+4. 거리 필터 (초기)
+
+- 거리(m)와 도보(분) 매핑 정의
+- 수정 전 : 100/200/300m → 2/3/5분
+- 수정 후 : DB `walk_minutes` 컬럼과 위 매핑 저장
+
+5. SQL 스크립트
+
+- SQL Server용 DDL·시드 추가
+- 추가 : `sql/schema.sql`, `sql/seed.sql`
+
+----------------------------------------------------------------------------------------------------
