@@ -570,6 +570,111 @@ label > .field-hint {
   color: #a16207;
 }
 
+/** 맛집 체크 시 스탬프 살짝 커졌다 돌아오는 팝 + 주변 점 퍼짐 */
+.toggle-stamp--popping .toggle-stamp__face {
+  animation: matjip-stamp-pop 0.42s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes matjip-stamp-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.14) rotate(-4deg);
+  }
+  100% {
+    transform: rotate(-2deg) scale(1.02);
+  }
+}
+
+.edit-matjip-toggle.toggle-stamp--popping .toggle-stamp__face {
+  animation-name: matjip-stamp-pop-edit;
+}
+
+@keyframes matjip-stamp-pop-edit {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.16) rotate(-4deg);
+  }
+  100% {
+    transform: rotate(-2deg) scale(1.04);
+  }
+}
+
+.toggle-stamp-burst {
+  position: absolute;
+  inset: -0.35rem;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.toggle-stamp-burst__dot {
+  --angle: calc(var(--burst-i, 0) * 45deg);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: #fbbf24;
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.75);
+  animation: matjip-burst-fly 0.55s ease-out forwards;
+}
+
+.toggle-stamp-burst__dot:nth-child(odd) {
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  background: #f59e0b;
+}
+
+@keyframes matjip-burst-fly {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--angle)) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--angle)) translateY(-2.4rem) scale(0.2);
+  }
+}
+
+.toggle-stamp--popping::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  border: 2px solid rgba(250, 204, 21, 0.65);
+  pointer-events: none;
+  animation: matjip-ring-pulse 0.52s ease-out forwards;
+}
+
+@keyframes matjip-ring-pulse {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle-stamp--popping .toggle-stamp__face,
+  .toggle-stamp-burst__dot,
+  .toggle-stamp--popping::after {
+    animation: none;
+  }
+
+  .toggle-stamp-burst {
+    display: none;
+  }
+}
+
 .name-matjip-row {
   display: flex;
   flex-direction: row;
@@ -581,6 +686,30 @@ label > .field-hint {
 .name-matjip-row .name-matjip-name {
   flex: 1;
   min-width: min(100%, 11rem);
+}
+
+/** 맛집 수정 화면: 맛집 토글만 이름 입력 위·가운데·크게 */
+.edit-matjip-row {
+  display: flex;
+  justify-content: center;
+  margin: 0.15rem 0 0.85rem;
+}
+
+.edit-matjip-toggle.toggle-stamp .toggle-stamp__face {
+  padding: 0.6rem 1.55rem 0.6rem 0.95rem;
+  font-size: 1.15rem;
+  border-width: 2.5px;
+}
+
+.edit-matjip-toggle.toggle-stamp .toggle-stamp__ring {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.82rem;
+  border-width: 2.5px;
+}
+
+.edit-matjip-toggle.toggle-stamp .toggle-stamp__input:checked + .toggle-stamp__face {
+  transform: rotate(-2deg) scale(1.04);
 }
 
 .form-rating-block {

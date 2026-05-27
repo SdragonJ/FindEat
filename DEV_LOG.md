@@ -62,6 +62,16 @@
 - 수정 전 : PC→공인IP:3001 타임아웃(3389 RDP만 허용), Windows 방화벽만으로는 부족
 - 수정 후 : Windows 인바운드 3001 + 네이버 클라우드 ACG(보안 그룹) 인바운드 TCP 3001, PC·운영 PC에서 테스트 서버 FindEat URL 접속 가능
 
+9. 맛집 수정 화면 UI 정리
+- 수정 화면에서 부가 안내·좌표 문구 제거, 맛집 토글을 식당 이름 위 가운데·크게 배치
+- 수정 전 : 「정보를 바꾼 뒤…」·`editGeoHint` 기준점/직선거리, 맛집 토글이 이름 옆 작은 스탬프
+- 수정 후 : 제목만 `맛집 수정`, `openEdit` 좌표 힌트 제거, `.edit-matjip-row`·`.edit-matjip-toggle` (`public/index.html`, `public/app.js`, `public/style.css`)
+
+10. 맛집 토글 체크 팝 이펙트
+- 맛집 스탬프 체크 시 짧은 확대·링·주변 점 퍼짐 애니메이션
+- 수정 전 : 체크 시 색·스탬프 변화만
+- 수정 후 : `setupMatjipPopEffect`·`playMatjipPop`, `.toggle-stamp-burst` (`public/app.js`, `public/style.css`), `prefers-reduced-motion` 시 생략
+
 ----------------------------------------------------------------------------------------------------
 
 ## 2026.05.18

@@ -195,28 +195,14 @@
             ← 돌아가기
           </button>
           <h2 class="sub-title">맛집 수정</h2>
-          <p class="sub-tagline">정보를 바꾼 뒤 저장해 주세요</p>
-          <p id="editGeoHint" class="field-hint" hidden></p>
         </header>
 
         <section class="card">
           <form id="formEdit" class="form-add">
             <input type="hidden" name="id" id="editId" />
             <div class="grid">
-              <div class="name-matjip-row full">
-                <label class="name-matjip-name">
-                  식당이름
-                  <input
-                    name="name"
-                    id="editName"
-                    class="input-required"
-                    required
-                    maxlength="120"
-                    placeholder="예: OO국밥"
-                    autocomplete="off"
-                  />
-                </label>
-                <label class="name-matjip-toggle toggle-stamp" for="editMatjip">
+              <div class="edit-matjip-row full">
+                <label class="edit-matjip-toggle toggle-stamp" for="editMatjip">
                   <input
                     type="checkbox"
                     name="is_matjip"
@@ -230,6 +216,18 @@
                   </span>
                 </label>
               </div>
+              <label class="full">
+                식당이름
+                <input
+                  name="name"
+                  id="editName"
+                  class="input-required"
+                  required
+                  maxlength="120"
+                  placeholder="예: OO국밥"
+                  autocomplete="off"
+                />
+              </label>
               <label class="full form-rating-block">
                 별점 (최대 5점)
                 <div class="rating-row">

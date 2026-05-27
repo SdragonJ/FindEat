@@ -196,6 +196,43 @@ function setupRatingPicker(starRowId, numInputId, matjipCheckboxId) {
 const addRatingPicker = setupRatingPicker('addStarRow', 'addRatingNum', 'addMatjip');
 const editRatingPicker = setupRatingPicker('editStarRow', 'editRatingNum', 'editMatjip');
 
+/** 맛집 스탬프 토글 체크 시 주변으로 퍼지는 짧은 팝 이펙트를 재생합니다. */
+function playMatjipPop(label) {
+  if (!label || label.querySelector('.toggle-stamp-burst')) return;
+  const burst = document.createElement('span');
+  burst.className = 'toggle-stamp-burst';
+  burst.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 8; i += 1) {
+    const dot = document.createElement('span');
+    dot.className = 'toggle-stamp-burst__dot';
+    dot.style.setProperty('--burst-i', String(i));
+    burst.appendChild(dot);
+  }
+  label.appendChild(burst);
+  label.classList.add('toggle-stamp--popping');
+  const cleanup = () => {
+    burst.remove();
+    label.classList.remove('toggle-stamp--popping');
+  };
+  burst.addEventListener('animationend', cleanup, { once: true });
+  window.setTimeout(cleanup, 700);
+}
+
+/**
+ * `.toggle-stamp` 맛집 체크박스에 change 리스너를 붙입니다. 체크될 때만 팝을 냅니다.
+ */
+function setupMatjipPopEffect() {
+  document.querySelectorAll('.toggle-stamp').forEach((label) => {
+    const input = label.querySelector('.toggle-stamp__input');
+    if (!input || input.dataset.matjipPopBound === '1') return;
+    input.dataset.matjipPopBound = '1';
+    input.addEventListener('change', () => {
+      if (!input.checked) return;
+      playMatjipPop(label);
+    });
+  });
+}
+
 function resolveIsMatjipForSubmit(ratingRaw, matjipChecked) {
   const r =
     ratingRaw === '' || ratingRaw == null ? null : parseInt(String(ratingRaw).trim(), 10);
@@ -551,26 +588,6 @@ async function openEdit(id) {
   const rt = r.rating != null && r.rating !== '' ? parseInt(String(r.rating), 10) : null;
   editRatingPicker.setVal(Number.isFinite(rt) && rt >= 1 && rt <= 5 ? rt : null);
   $('#editMatjip').checked = isMatjipRestaurant(r);
-  const geoHint = $('#editGeoHint');
-  if (geoHint) {
-    const ref = r.reference_location;
-    const hasPlace = r.latitude != null && r.longitude != null;
-    const hasDist = r.distance_meters != null;
-    if (ref && ref.latitude != null && ref.longitude != null && (hasPlace || hasDist)) {
-      let t = `기준점(내 위치·.env): 위 ${Number(ref.latitude).toFixed(5)}, 경 ${Number(ref.longitude).toFixed(5)}.`;
-      if (hasPlace) {
-        t += ` 이 식당: 위 ${Number(r.latitude).toFixed(5)}, 경 ${Number(r.longitude).toFixed(5)}.`;
-      }
-      if (hasDist) {
-        t += ` 직선 약 ${r.distance_meters}m.`;
-      }
-      geoHint.textContent = t;
-      geoHint.hidden = false;
-    } else {
-      geoHint.textContent = '';
-      geoHint.hidden = true;
-    }
-  }
   showEdit();
 }
 
@@ -876,6 +893,7 @@ $('#btnEditDelete').addEventListener('click', async () => {
  */
 (async function init() {
   setupFormPlaceholders();
+  setupMatjipPopEffect();
   try {
     const h = await fetchJSON('/api/health');
     $('#dbStatus').textContent = h.db ? 'DB 연결됨' : 'DB 오류';
