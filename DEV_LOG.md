@@ -85,7 +85,7 @@
 13. CD PowerShell 인코딩 파싱 오류 수정
 - 테스트 서버 배포 단계의 한글 `throw` 메시지가 깨지며 PowerShell 구문 오류가 나던 문제를 ASCII 메시지로 교체
 - 수정 전 : `Deploy` 단계에서 `Unexpected token`, `string is missing the terminator`로 실패
-- 수정 후 : `.github/workflows/ci-cd.yml` `run` 블록 오류 문구를 영문으로 변경해 파싱 안정화 + 단계별 종료코드 검사(`Step failed: ...`)와 `pm2.cmd` fallback으로 실패 지점 진단 강화, `docs/GITHUB_ACTIONS.md` EPERM 대응 가이드 보강
+- 수정 후 : `.github/workflows/ci-cd.yml` `run` 블록 오류 문구를 영문으로 변경해 파싱 안정화 + 단계별 종료코드 검사(`Step failed: ...`)와 `pm2` PATH 미존재 시 로컬 prefix(`C:\dev\FindEat\.npm-global`) 자동 설치 fallback으로 NETWORK SERVICE 환경에서도 재시작 가능하도록 보강, `docs/GITHUB_ACTIONS.md` EPERM 대응 가이드 보강
 
 ----------------------------------------------------------------------------------------------------
 

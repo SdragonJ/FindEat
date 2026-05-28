@@ -109,6 +109,7 @@ GitHub → **Actions** 탭 → `CI/CD` 워크플로 실행 목록
 | `pm2` 없음                   | PATH, `pm2 restart findeat` 이름                             |
 | `.git/FETCH_HEAD` EPERM      | Runner 서비스 로그온 계정 확인 (`.\Administrator` 권장)      |
 | `node_modules` EPERM unlink  | 서비스 계정 권한·백신 파일 잠금·동시 프로세스 확인           |
+| `Test-Path ... UnauthorizedAccess` | 서비스 계정이 `C:\Users\Administrator\...` 접근 불가. CD는 로컬 prefix(`C:\dev\FindEat\.npm-global`)로 pm2 설치 fallback 사용 |
 | CD `pwsh: command not found` | workflow는 `powershell`(5.x) 사용. pwsh 미설치 서버에서 발생 |
 
 ### Runner 서비스가 Stopped / Offline일 때

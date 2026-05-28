@@ -80,19 +80,25 @@ jobs:
           npm ci --omit=dev
           Assert-LastExit "npm ci --omit=dev"
           Write-Host "=== pm2 restart ==="
-          $pm2 = Get-Command pm2 -ErrorAction SilentlyContinue
-          if (-not $pm2) {
-            $pm2Cmd = "C:\Users\Administrator\AppData\Roaming\npm\pm2.cmd"
-            if (Test-Path $pm2Cmd) {
-              & $pm2Cmd restart $env:PM2_APP_NAME
-              Assert-LastExit "pm2 restart (fallback path)"
-              & $pm2Cmd status $env:PM2_APP_NAME
-              Assert-LastExit "pm2 status (fallback path)"
-              exit 0
+          $pm2Cmd = $null
+          $pm2Found = Get-Command pm2 -ErrorAction SilentlyContinue
+          if ($pm2Found) {
+            $pm2Cmd = $pm2Found.Source
+            Write-Host "pm2 in PATH: $pm2Cmd"
+          } else {
+            Write-Host "pm2 not found in PATH. Installing pm2 in local deploy prefix for service account..."
+            $localPrefix = Join-Path $path ".npm-global"
+            npm config set prefix $localPrefix
+            Assert-LastExit "npm config set prefix"
+            npm install -g pm2
+            Assert-LastExit "npm install -g pm2 (local prefix)"
+            $pm2Cmd = Join-Path $localPrefix "pm2.cmd"
+            if (-not (Test-Path $pm2Cmd)) {
+              throw "pm2 install finished but pm2.cmd not found at $pm2Cmd"
             }
-            throw "pm2 command not found in PATH. Set runner service logon account to .\Administrator or install pm2 for the service account."
+            Write-Host "pm2 local path: $pm2Cmd"
           }
-          pm2 restart $env:PM2_APP_NAME
+          & $pm2Cmd restart $env:PM2_APP_NAME
           Assert-LastExit "pm2 restart"
-          pm2 status $env:PM2_APP_NAME
+          & $pm2Cmd status $env:PM2_APP_NAME
           Assert-LastExit "pm2 status"
