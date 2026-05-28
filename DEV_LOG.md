@@ -77,6 +77,11 @@
 - 수정 전 : PC push 후 서버에서 수동 `git pull`·`pm2 restart findeat`
 - 수정 후 : `.github/workflows/ci-cd.yml`, `npm run check`, `docs/GITHUB_ACTIONS.md`(Runner 설치·배포 경로 `C:\dev\FindEat`, PowerShell `Exiting` 시 cmd `--unattended --runasservice`, CD shell `powershell`로 pwsh 미설치 대응, Runner는 `C:\actions-runner` 권장·`Administrator` 폴더+NETWORK SERVICE 시 권한 오류)
 
+12. 로그인 없이 “내가 추가한 식당” 섞어 보기
+- 브라우저 쿠키 UUID(`findeat_uid`)를 발급해 네이버 공통 데이터 + 내 추가분(`owner_client_id`)을 함께 노출
+- 수정 전 : 목록·추천·카테고리·수정/삭제가 전체 공통 데이터 기준, 직접 추가 소유자 구분 없음
+- 수정 후 : `GET /api/me`·쿠키 발급, 목록/추천/카테고리 접근 범위 `(source='naver' OR owner_client_id=쿠키ID)`, `POST` 시 `owner_client_id` 저장, `GET/PUT/DELETE /api/restaurants/:id` 접근 가드, 스키마/마이그레이션 `owner_client_id` 추가 (`server.js`, `public/app.js`, `sql/schema_mariadb.sql`, `sql/schema.sql`, `sql/migration_mariadb_restaurants_owner_client_id.sql`, `.env.example`)
+
 ----------------------------------------------------------------------------------------------------
 
 ## 2026.05.18

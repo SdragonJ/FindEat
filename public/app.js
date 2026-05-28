@@ -894,6 +894,12 @@ $('#btnEditDelete').addEventListener('click', async () => {
 (async function init() {
   setupFormPlaceholders();
   setupMatjipPopEffect();
+  // 로그인 없이도 브라우저별 식별 쿠키를 먼저 발급받아 “내가 추가한 식당”을 구분합니다.
+  try {
+    await fetchJSON('/api/me');
+  } catch {
+    // 쿠키 발급 실패 시에도 화면은 띄우되, 내 추가분 분리는 서버 응답에 따릅니다.
+  }
   try {
     const h = await fetchJSON('/api/health');
     $('#dbStatus').textContent = h.db ? 'DB 연결됨' : 'DB 오류';

@@ -19,6 +19,8 @@
 -- │   4. migration_mariadb_restaurants_user_touched_at.sql
 -- │   5. latitude/longitude 가 정수형이라 37·127 만 들어가면:
 -- │      migration_mariadb_restaurants_latlng_decimal.sql
+-- │   6. 로그인 없이 브라우저별 소유 구분이 필요하면:
+-- │      migration_mariadb_restaurants_owner_client_id.sql
 -- └───────────────────────────────────────────────────────────────────────────
 --
 -- SQL Server 참고본(컬럼 의미 동일 유지): `sql/schema.sql`
@@ -44,13 +46,15 @@ CREATE TABLE `restaurants` (
   `longitude` decimal(10,7) DEFAULT NULL COMMENT '식당 경도(WGS84, 네이버 mapx÷1e7)',
   `distance_meters` int(10) unsigned DEFAULT NULL COMMENT 'NAVER_REFERENCE_* 기준 직선거리(m)',
   `source` varchar(100) NOT NULL DEFAULT 'user' COMMENT '출처: user=직접등록, naver=네이버 등',
+  `owner_client_id` char(36) DEFAULT NULL COMMENT '로그인 없이 브라우저별 소유 구분(UUID v4). naver 공통 데이터는 NULL',
   `external_id` varchar(100) DEFAULT NULL COMMENT 'API의 장소 고유 ID',
   `phone` varchar(100) DEFAULT NULL COMMENT '번호',
   `place_url` varchar(100) DEFAULT NULL COMMENT '지도/상세 링크',
   `last_synced_at` datetime DEFAULT NULL COMMENT '마지막 수집 시각',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_source_external` (`source`,`external_id`),
-  KEY `idx_category` (`category`)
+  KEY `idx_category` (`category`),
+  KEY `idx_owner_client_id` (`owner_client_id`)
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci

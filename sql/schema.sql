@@ -34,6 +34,7 @@ BEGIN
         longitude        DECIMAL(10, 7)  NULL,
         distance_meters  INT             NULL,
         source           NVARCHAR(100)   NOT NULL CONSTRAINT DF_restaurants_source DEFAULT (N'user'),
+        owner_client_id  CHAR(36)        NULL,
         external_id      NVARCHAR(100)   NULL,
         phone            NVARCHAR(100)   NULL,
         place_url        NVARCHAR(100)   NULL,
@@ -43,5 +44,6 @@ BEGIN
     );
 
     CREATE NONCLUSTERED INDEX idx_category ON dbo.restaurants (category);
+    CREATE NONCLUSTERED INDEX idx_owner_client_id ON dbo.restaurants (owner_client_id);
 END
 GO

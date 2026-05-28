@@ -12,6 +12,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2/promise");
+const crypto = require("crypto");
 const path = require("path");
 const {
   parseQueriesFromEnv,
@@ -90,6 +91,8 @@ function queryMatjipOnly(raw) {
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const CLIENT_COOKIE_NAME = "findeat_uid";
+const CLIENT_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 365;
 
 // 다른 출처(포트가 다른 프론트 등)에서 API를 부를 때 브라우저가 막지 않도록 CORS 허용
 app.use(cors());
@@ -99,6 +102,70 @@ app.use(express.json());
 
 // public/index.html, app.js, style.css 등 정적 파일 제공
 app.use(express.static("public"));
+
+/**
+ * Cookie 헤더 문자열(`a=1; b=2`)을 객체로 바꿉니다.
+ * 로그인 없이도 “이 브라우저 사용자”를 구분하는 ID(`findeat_uid`)를 읽을 때 사용합니다.
+ */
+function parseCookieHeader(cookieHeader) {
+  const out = {};
+  const raw = String(cookieHeader || "");
+  if (!raw.trim()) return out;
+  raw.split(";").forEach((part) => {
+    const idx = part.indexOf("=");
+    if (idx < 1) return;
+    const key = decodeURIComponent(part.slice(0, idx).trim());
+    const val = decodeURIComponent(part.slice(idx + 1).trim());
+    if (!key) return;
+    out[key] = val;
+  });
+  return out;
+}
+
+/** `findeat_uid` 형식(대시 포함 UUID v4)을 간단히 확인합니다. */
+function isValidClientId(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(v || ""),
+  );
+}
+
+/** 요청 쿠키에서 `findeat_uid`를 읽고, 없거나 형식이 이상하면 null을 반환합니다. */
+function readClientIdFromReq(req) {
+  const cookies = parseCookieHeader(req.headers?.cookie);
+  const cid = cookies[CLIENT_COOKIE_NAME];
+  return isValidClientId(cid) ? cid : null;
+}
+
+/** 응답 헤더에 장기 쿠키(`findeat_uid`)를 내려 다음 방문에서도 같은 사용자를 구분합니다. */
+function setClientIdCookie(res, clientId) {
+  res.setHeader(
+    "Set-Cookie",
+    `${CLIENT_COOKIE_NAME}=${encodeURIComponent(clientId)}; Path=/; Max-Age=${CLIENT_COOKIE_MAX_AGE_SEC}; HttpOnly; SameSite=Lax`,
+  );
+}
+
+/**
+ * 현재 요청의 클라이언트 ID를 보장합니다.
+ * - 이미 쿠키가 있으면 그대로
+ * - 없으면 UUID를 새로 만들고 쿠키로 발급
+ */
+function ensureClientId(req, res) {
+  const existing = readClientIdFromReq(req);
+  if (existing) return existing;
+  const created = crypto.randomUUID();
+  setClientIdCookie(res, created);
+  return created;
+}
+
+/**
+ * 로그인 없이 볼 수 있는 기본 범위:
+ * - 네이버 공통 데이터(source='naver')
+ * - 내 브라우저가 추가한 데이터(owner_client_id=내 쿠키 ID)
+ * - 예전 데이터 호환: owner_client_id 가 비어 있는 user 행(기존 공통 데이터)
+ */
+function visibilityScopeSql() {
+  return "(source = 'naver' OR owner_client_id = ? OR (source = 'user' AND owner_client_id IS NULL))";
+}
 
 /** SQL 연결 풀: 프로세스가 살아 있는 동안 한 번 만들고 재사용합니다. */
 let pool;
@@ -195,11 +262,21 @@ app.get("/api/health", async (_req, res) => {
 });
 
 /**
+ * GET /api/me — 로그인 없이도 브라우저별 고유 ID를 발급/확인합니다.
+ * 프론트는 페이지 초기화 시 이 API를 한 번 호출해 `findeat_uid` 쿠키를 확정합니다.
+ */
+app.get("/api/me", (req, res) => {
+  const clientId = ensureClientId(req, res);
+  res.json({ ok: true, client_id: clientId });
+});
+
+/**
  * GET /api/restaurants — 맛집 목록(페이지). 쿼리: `category`, `max_walk_minutes`, `min_rating`, `matjip_only`, `page`, `limit`.
  * 응답: `{ items, total, page, pageSize, totalPages }`. `reference_location` 은 `.env` 기준점(내 위치) 위·경도, 각 item 의 `latitude`/`longitude` 는 **식당** 좌표, `distance_meters`/`walk_minutes` 는 기준점에서 식당까지입니다.
  * 정렬은 `user_touched_at`·`category`·`name` 규칙 동일.
  */
 app.get("/api/restaurants", async (req, res) => {
+  const clientId = ensureClientId(req, res);
   const category = req.query.category;
   const walkFilter = parseWalkFilterFromQuery(req.query);
   const minRatingRaw = req.query.min_rating;
@@ -222,6 +299,8 @@ app.get("/api/restaurants", async (req, res) => {
 
   const conds = [];
   const params = [];
+  conds.push(visibilityScopeSql());
+  params.push(clientId);
   if (category && String(category).trim()) {
     conds.push("category = ?");
     params.push(String(category).trim());
@@ -274,14 +353,18 @@ app.get("/api/restaurants", async (req, res) => {
 });
 
 /**
- * GET /api/restaurants/categories — 등록된 맛집에서 DISTINCT 카테고리 문자열 배열을 반환합니다.
+ * GET /api/restaurants/categories — 네이버 공통 + 내 추가분에서 DISTINCT 카테고리를 반환합니다.
  * 프론트 셀렉트 옵션 채우기용입니다.
  */
-app.get("/api/restaurants/categories", async (_req, res) => {
+app.get("/api/restaurants/categories", async (req, res) => {
+  const clientId = ensureClientId(req, res);
   try {
     const p = await getPool();
     const [recordset] = await p.query(
-      "SELECT DISTINCT category FROM restaurants ORDER BY category",
+      `SELECT DISTINCT category FROM restaurants
+       WHERE ${visibilityScopeSql()}
+       ORDER BY category`,
+      [clientId],
     );
     res.json(recordset.map((r) => r.category));
   } catch (e) {
@@ -295,6 +378,7 @@ app.get("/api/restaurants/categories", async (_req, res) => {
  * 쿼리: `category`, `max_walk_minutes`, `min_rating`, `matjip_only`(1/true면 is_matjip=1 만). 응답에 `latitude`·`longitude`·`distance_meters` 포함.
  */
 app.get("/api/restaurants/pick", async (req, res) => {
+  const clientId = ensureClientId(req, res);
   const category = req.query.category;
   const walkFilter = parseWalkFilterFromQuery(req.query);
   const minRatingRaw = req.query.min_rating;
@@ -310,6 +394,8 @@ app.get("/api/restaurants/pick", async (req, res) => {
     const p = await getPool();
     const conds = [];
     const params = [];
+    conds.push(visibilityScopeSql());
+    params.push(clientId);
     if (category && String(category).trim()) {
       conds.push("category = ?");
       params.push(String(category).trim());
@@ -347,6 +433,7 @@ app.get("/api/restaurants/pick", async (req, res) => {
  * [문법] `return res.status(400)...`처럼 조기 `return`으로 “이 아래는 실행하지 않음”을 표현합니다.
  */
 app.post("/api/restaurants", async (req, res) => {
+  const clientId = ensureClientId(req, res);
   const { name, category, address, walk_minutes, memo, rating, is_matjip } = req.body || {};
   if (!name || !String(name).trim()) {
     return res.status(400).json({ error: "식당이름은 필수입니다." });
@@ -371,8 +458,8 @@ app.post("/api/restaurants", async (req, res) => {
       memo != null ? String(memo).trim().slice(0, 500) || null : null;
 
     const [result] = await p.query(
-      `INSERT INTO restaurants (name, category, address, walk_minutes, memo, rating, is_matjip, source, user_touched_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'user', NOW())`,
+      `INSERT INTO restaurants (name, category, address, walk_minutes, memo, rating, is_matjip, source, owner_client_id, user_touched_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'user', ?, NOW())`,
       [
         String(name).trim(),
         catFinal,
@@ -381,6 +468,7 @@ app.post("/api/restaurants", async (req, res) => {
         memoVal,
         ratingVal,
         matjipVal,
+        clientId,
       ],
     );
     res.status(201).json({ id: result.insertId });
@@ -394,6 +482,7 @@ app.post("/api/restaurants", async (req, res) => {
  * GET /api/restaurants/:id — 단일 맛집 상세(수정 폼 채우기용). 경로 파라미터는 `req.params.id`.
  */
 app.get("/api/restaurants/:id", async (req, res) => {
+  const clientId = ensureClientId(req, res);
   const id = parseInt(req.params.id, 10);
   if (!Number.isFinite(id) || id < 1) {
     return res.status(400).json({ error: "잘못된 id입니다." });
@@ -401,8 +490,10 @@ app.get("/api/restaurants/:id", async (req, res) => {
   try {
     const p = await getPool();
     const [recordset] = await p.query(
-      "SELECT id, name, category, address, walk_minutes, memo, rating, is_matjip, source, created_at, user_touched_at, latitude, longitude, distance_meters FROM restaurants WHERE id = ?",
-      [id],
+      `SELECT id, name, category, address, walk_minutes, memo, rating, is_matjip, source, created_at, user_touched_at, latitude, longitude, distance_meters
+       FROM restaurants
+       WHERE id = ? AND ${visibilityScopeSql()}`,
+      [id, clientId],
     );
     if (!recordset.length) {
       return res.status(404).json({ error: "맛집을 찾을 수 없습니다." });
@@ -419,6 +510,7 @@ app.get("/api/restaurants/:id", async (req, res) => {
  * `source` 는 바꾸지 않습니다. 저장 시 `user_touched_at` 만 갱신합니다.
  */
 app.put("/api/restaurants/:id", async (req, res) => {
+  const clientId = ensureClientId(req, res);
   const id = parseInt(req.params.id, 10);
   if (!Number.isFinite(id) || id < 1) {
     return res.status(400).json({ error: "잘못된 id입니다." });
@@ -442,7 +534,8 @@ app.put("/api/restaurants/:id", async (req, res) => {
       memo != null ? String(memo).trim().slice(0, 500) || null : null;
 
     const [result] = await p.query(
-      `UPDATE restaurants SET name=?, category=?, address=?, walk_minutes=?, memo=?, rating=?, is_matjip=?, user_touched_at=NOW() WHERE id=?`,
+      `UPDATE restaurants SET name=?, category=?, address=?, walk_minutes=?, memo=?, rating=?, is_matjip=?, user_touched_at=NOW()
+       WHERE id=? AND ${visibilityScopeSql()}`,
       [
         String(name).trim(),
         catFinal,
@@ -452,6 +545,7 @@ app.put("/api/restaurants/:id", async (req, res) => {
         ratingVal,
         matjipVal,
         id,
+        clientId,
       ],
     );
     if (result.affectedRows === 0) {
@@ -468,13 +562,17 @@ app.put("/api/restaurants/:id", async (req, res) => {
  * DELETE /api/restaurants/:id — 한 행 삭제. 없으면 404.
  */
 app.delete("/api/restaurants/:id", async (req, res) => {
+  const clientId = ensureClientId(req, res);
   const id = parseInt(req.params.id, 10);
   if (!Number.isFinite(id) || id < 1) {
     return res.status(400).json({ error: "잘못된 id입니다." });
   }
   try {
     const p = await getPool();
-    const [result] = await p.query("DELETE FROM restaurants WHERE id = ?", [id]);
+    const [result] = await p.query(
+      `DELETE FROM restaurants WHERE id = ? AND ${visibilityScopeSql()}`,
+      [id, clientId],
+    );
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: "맛집을 찾을 수 없습니다." });
     }
