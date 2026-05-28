@@ -107,6 +107,8 @@ GitHub → **Actions** 탭 → `CI/CD` 워크플로 실행 목록
 | `C:\dev\FindEat` 없음        | clone 경로·`DEPLOY_PATH`                                     |
 | `git pull` 실패              | private repo 자격 증명                                       |
 | `pm2` 없음                   | PATH, `pm2 restart findeat` 이름                             |
+| `.git/FETCH_HEAD` EPERM      | Runner 서비스 로그온 계정 확인 (`.\Administrator` 권장)      |
+| `node_modules` EPERM unlink  | 서비스 계정 권한·백신 파일 잠금·동시 프로세스 확인           |
 | CD `pwsh: command not found` | workflow는 `powershell`(5.x) 사용. pwsh 미설치 서버에서 발생 |
 
 ### Runner 서비스가 Stopped / Offline일 때
@@ -136,6 +138,11 @@ cd C:\actions-runner
 ```
 
 또는 서비스 **로그온을 `.\Administrator`** 로 바꾸면 같은 경로에서도 될 수 있으나, **`C:\actions-runner` + CD용 `git pull`/`pm2`** 가 더 단순합니다.
+
+### CD 로그에 단계 이름이 안 보일 때
+
+`ci-cd.yml` Deploy 스크립트는 각 단계(`git fetch`, `npm ci`, `pm2 restart`) 뒤에 종료 코드를 검사합니다.  
+실패 시 `Step failed: ...` 형태로 실패 지점을 바로 표시하므로, 해당 단계의 권한/경로를 우선 확인합니다.
 
 ---
 

@@ -52,19 +52,47 @@ jobs:
       - name: Deploy (pull + install + pm2 restart)
         run: |
           $ErrorActionPreference = 'Stop'
+          function Assert-LastExit([string]$stepName) {
+            if ($LASTEXITCODE -ne 0) {
+              throw "Step failed: $stepName (exit code=$LASTEXITCODE)"
+            }
+          }
+
+          Write-Host "=== Runner context ==="
+          whoami
+          Write-Host "PWD(before): $(Get-Location)"
           $path = $env:DEPLOY_PATH
           if (-not (Test-Path $path)) {
             throw "Deploy path not found: $path. Clone this repository on the runner host first."
           }
           Set-Location $path
-          git config --global --add safe.directory $path 2>$null
+          Write-Host "PWD(deploy): $(Get-Location)"
+          Write-Host "=== Git pull ==="
+          git config --global --add safe.directory $path
+          Assert-LastExit "git config safe.directory"
           git fetch origin main
+          Assert-LastExit "git fetch origin main"
           git checkout main
+          Assert-LastExit "git checkout main"
           git pull origin main
+          Assert-LastExit "git pull origin main"
+          Write-Host "=== npm install ==="
           npm ci --omit=dev
+          Assert-LastExit "npm ci --omit=dev"
+          Write-Host "=== pm2 restart ==="
           $pm2 = Get-Command pm2 -ErrorAction SilentlyContinue
           if (-not $pm2) {
-            throw "pm2 command not found. Install with 'npm install -g pm2' and ensure it is in PATH."
+            $pm2Cmd = "C:\Users\Administrator\AppData\Roaming\npm\pm2.cmd"
+            if (Test-Path $pm2Cmd) {
+              & $pm2Cmd restart $env:PM2_APP_NAME
+              Assert-LastExit "pm2 restart (fallback path)"
+              & $pm2Cmd status $env:PM2_APP_NAME
+              Assert-LastExit "pm2 status (fallback path)"
+              exit 0
+            }
+            throw "pm2 command not found in PATH. Set runner service logon account to .\Administrator or install pm2 for the service account."
           }
           pm2 restart $env:PM2_APP_NAME
+          Assert-LastExit "pm2 restart"
           pm2 status $env:PM2_APP_NAME
+          Assert-LastExit "pm2 status"
