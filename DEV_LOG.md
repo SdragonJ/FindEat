@@ -82,6 +82,11 @@
 - 수정 전 : 목록·추천·카테고리·수정/삭제가 전체 공통 데이터 기준, 직접 추가 소유자 구분 없음
 - 수정 후 : `GET /api/me`·쿠키 발급, 목록/추천/카테고리 접근 범위 `(source='naver' OR owner_client_id=쿠키ID)`, `POST` 시 `owner_client_id` 저장, `GET/PUT/DELETE /api/restaurants/:id` 접근 가드, 스키마/마이그레이션 `owner_client_id` 추가 (`server.js`, `public/app.js`, `sql/schema_mariadb.sql`, `sql/schema.sql`, `sql/migration_mariadb_restaurants_owner_client_id.sql`, `.env.example`)
 
+13. CD PowerShell 인코딩 파싱 오류 수정
+- 테스트 서버 배포 단계의 한글 `throw` 메시지가 깨지며 PowerShell 구문 오류가 나던 문제를 ASCII 메시지로 교체
+- 수정 전 : `Deploy` 단계에서 `Unexpected token`, `string is missing the terminator`로 실패
+- 수정 후 : `.github/workflows/ci-cd.yml` `run` 블록 오류 문구를 영문으로 변경해 파싱 안정화
+
 ----------------------------------------------------------------------------------------------------
 
 ## 2026.05.18
