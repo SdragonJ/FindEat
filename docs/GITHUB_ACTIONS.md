@@ -29,7 +29,7 @@ cd C:\Users\Administrator\actions-runner
 config.cmd --url https://github.com/SdragonJ/FindEat --token 여기_새_토큰 --name findeat-test --unattended --runasservice
 ```
 
-PowerShell에서는 `config.cmd` 대신 **`.\config.cmd`** 로 실행합니다.
+PowerShell에서는 `config.cmd` 대신 **`.\config.cmd`** 로 실행합니다.  
 
 - 토큰: GitHub Runners → **New self-hosted runner** → Configure 줄에만 잠깐 표시되는 값 (**만료 빠름**, 채팅·스크린샷에 올리지 말 것)
 - 이미 같은 이름 Runner가 있으면 `--replace` 추가
